@@ -42,7 +42,7 @@
     var s = snap(), body = JSON.stringify({ data: s });
     return fetch(api + '/state', { method: 'PUT', headers: headers(), body: body, keepalive: !!unloading && body.length < 60000 })
       .then(function (r) {
-        if (r.status === 401) { leave(false); return; }
+        if ((r.status === 401 || r.status === 403)) { leave(false); return; }
         if (r.ok) { markSynced(s); if (dirty() && !unloading) schedule(); }
       })
       .catch(function () {});
@@ -60,7 +60,7 @@
     if (dirty()) { push(false); return; }
     pulling = true;
     fetch(api + '/state', { headers: headers() })
-      .then(function (r) { if (r.status === 401) { leave(false); return null; } return r.ok ? r.json() : null; })
+      .then(function (r) { if ((r.status === 401 || r.status === 403)) { leave(false); return null; } return r.ok ? r.json() : null; })
       .then(function (j) {
         pulling = false;
         if (!j) return;
