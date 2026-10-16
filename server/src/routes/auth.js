@@ -4,22 +4,10 @@ import { OAuth2Client } from "google-auth-library";
 import User from "../models/User.js";
 import { requireAuth } from "../middleware/auth.js";
 import { wrap } from "../utils/wrap.js";
-import { SOUND_STYLES } from "../utils/validate.js";
 
 const router = Router();
 
-export const publicUser = (u) => ({
-  id: u._id,
-  email: u.email,
-  name: u.name,
-  picture: u.picture,
-  displayName: u.displayName || "",
-  settings: {
-    sound: u.settings?.sound ?? true,
-    soundStyle: u.settings?.soundStyle || "chime",
-    notifications: u.settings?.notifications ?? false,
-  },
-});
+const publicUser = (u) => ({ id: String(u._id), email: u.email, name: u.name, picture: u.picture });
 
 // Exchange a Google ID token for our own session token.
 router.post("/google", wrap(async (req, res) => {
@@ -48,19 +36,6 @@ router.post("/google", wrap(async (req, res) => {
 router.get("/me", requireAuth, wrap(async (req, res) => {
   const user = await User.findById(req.userId);
   if (!user) return res.status(401).json({ error: "Account not found" });
-  res.json({ user: publicUser(user) });
-}));
-
-router.patch("/me", requireAuth, wrap(async (req, res) => {
-  const set = {};
-  const { displayName, settings } = req.body || {};
-  if (typeof displayName === "string") set.displayName = displayName.trim().slice(0, 60);
-  if (settings && typeof settings === "object") {
-    if (typeof settings.sound === "boolean") set["settings.sound"] = settings.sound;
-    if (typeof settings.notifications === "boolean") set["settings.notifications"] = settings.notifications;
-    if (SOUND_STYLES.includes(settings.soundStyle)) set["settings.soundStyle"] = settings.soundStyle;
-  }
-  const user = await User.findByIdAndUpdate(req.userId, { $set: set }, { new: true });
   res.json({ user: publicUser(user) });
 }));
 
