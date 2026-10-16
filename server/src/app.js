@@ -3,11 +3,7 @@ import express from "express";
 import cors from "cors";
 import { connectDB } from "./db.js";
 import authRoutes from "./routes/auth.js";
-import shiftRoutes from "./routes/shift.js";
-import logRoutes from "./routes/logs.js";
-import holidayRoutes from "./routes/holidays.js";
-import importRoutes from "./routes/import.js";
-import dataRoutes from "./routes/data.js";
+import stateRoutes from "./routes/state.js";
 
 const app = express();
 
@@ -35,18 +31,13 @@ app.use(async (_req, _res, next) => {
 });
 
 app.use("/api/auth", authRoutes);
-app.use("/api/shift", shiftRoutes);
-app.use("/api/logs", logRoutes);
-app.use("/api/holidays", holidayRoutes);
-app.use("/api/import", importRoutes);
-app.use("/api/data", dataRoutes);
+app.use("/api/state", stateRoutes);
 
 app.use((_req, res) => res.status(404).json({ error: "Not found" }));
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
   console.error(err);
-  if (err.code === "LIMIT_FILE_SIZE") return res.status(413).json({ error: "File is too large (max 4 MB)" });
   res.status(err.status || 500).json({ error: err.message || "Server error" });
 });
 
