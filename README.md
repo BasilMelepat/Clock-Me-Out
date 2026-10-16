@@ -1,3 +1,4 @@
+[README.md](https://github.com/user-attachments/files/33540009/README.md)
 # Clock me Out (MERN)
 
 The original Clock me Out app, unchanged in look and behaviour, with Google sign-in and per-account cloud storage.
@@ -12,7 +13,7 @@ clock-me-out/
 ```
 
 ## How it works
-1. `/` shows the Google sign-in page (React). After sign-in it downloads your saved data and opens `/app.html`.
+1. `/` shows the sign-in page (React) with **Sign in / Sign up** tabs: email + password, or Google. After sign-in it downloads your saved data and opens `/app.html`.
 2. `/app.html` is the original app. A sync script mirrors its six data keys (logs, shift, holidays, absences, name) to the API a moment after every change, and when you leave the page.
 3. When you return to a tab, newer data from another device is picked up automatically.
 4. Theme, pointer effects and sound stay per device, exactly as before.
@@ -56,12 +57,25 @@ Add the client URL to the Google OAuth Authorized JavaScript origins, then redep
 ## API
 | Route | Purpose |
 |---|---|
+| `POST /api/auth/register` | Create an email + password account, return a session token |
+| `POST /api/auth/login` | Sign in with email + password |
 | `POST /api/auth/google` | Verify the Google ID token, return a session token |
 | `GET /api/auth/me` | Current user |
+| `POST /api/admin/login`, `GET /api/admin/stats`, `GET/PATCH/DELETE /api/admin/users…` | Admin dashboard (admin token only) |
 | `GET /api/state` | The user's saved data (`data` is `null` until first save) |
 | `PUT /api/state` | Replace the user's saved data |
 
+## Admin dashboard
+Open `https://<your-client>/admin`. Sign in with `ADMIN_EMAIL` and `ADMIN_PASSWORD`, which you set as environment variables on the **server** project (not in the database, and not tied to any user account). Use a unique password of 12+ characters.
+- Overview: total users, new sign-ups, active users, Google vs email split, 14-day sign-up chart.
+- Users: search, view a summary, disable or enable, unlock, delete.
+- Admin sessions last 8 hours and end when the tab closes. 5 wrong passwords from one IP lock admin sign-in for 15 minutes.
+- Privacy: the dashboard shows summaries (days logged, last saved), never a person's actual entries.
+- A disabled user is signed out and blocked on their next request.
+
 ## Notes
+- One account per email: a Google account and a password account with the same email are not merged. Passwords are hashed with scrypt; 8 failed sign-ins lock that account for 15 minutes.
+- There is no email verification or "forgot password" yet (both need an email-sending service).
 - If two devices edit at the same time, the most recent save wins.
 - The session token lives in `localStorage` for 30 days. For stricter security, move it to an httpOnly cookie (needs `SameSite=None; Secure` across two Vercel domains).
 - To update the app itself later, edit `client/public/app.html` and keep the sync `<script>` at the top of `<head>`.
