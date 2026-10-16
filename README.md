@@ -1,79 +1,67 @@
 # Clock me Out (MERN)
 
-Work-hours and clock-out calculator with Google sign-in.
-React (Vite) client · Express API · MongoDB Atlas · deployable to Vercel.
+The original Clock me Out app, unchanged in look and behaviour, with Google sign-in and per-account cloud storage.
+React (Vite) sign-in shell · Express API · MongoDB Atlas · deployable to Vercel.
 
 ```
 clock-me-out/
-├── client/   React app (Vite)
-└── server/   Express API (runs as a Vercel serverless function)
+├── client/
+│   ├── public/app.html   the original app (v2.282) + a small sync script and a "Sign out" row in Settings
+│   └── src/              React sign-in page (Google) that loads your data, then opens /app.html
+└── server/               Express API (runs as a Vercel serverless function)
 ```
 
+## How it works
+1. `/` shows the Google sign-in page (React). After sign-in it downloads your saved data and opens `/app.html`.
+2. `/app.html` is the original app. A sync script mirrors its six data keys (logs, shift, holidays, absences, name) to the API a moment after every change, and when you leave the page.
+3. When you return to a tab, newer data from another device is picked up automatically.
+4. Theme, pointer effects and sound stay per device, exactly as before.
+
+## Moving your existing data over
+On the old site: Settings → Backup → **Download backup**.
+On the new site: Settings → Backup → **Restore backup**, choose that file.
+
 ## 1. One-time setup
-
-### MongoDB Atlas
-1. Create a free cluster, then a database user.
-2. Network Access → allow `0.0.0.0/0` (Vercel IPs change).
-3. Copy the connection string into `MONGODB_URI`.
-
-### Google sign-in
-1. Google Cloud Console → APIs & Services → OAuth consent screen → configure it (add test users while in Testing mode).
-2. Credentials → Create credentials → OAuth client ID → **Web application**.
-3. Authorized JavaScript origins: `http://localhost:5173` and, later, your deployed client URL.
-4. Copy the Client ID. No redirect URI is needed.
+**MongoDB Atlas:** free cluster, a database user, Network Access `0.0.0.0/0`. Copy the connection string into `MONGODB_URI`.
+**Google sign-in:** Google Auth Platform → Clients → Web application. Authorized JavaScript origins: `http://localhost:5173` and your deployed client URL. Copy the Client ID.
 
 ## 2. Run locally
-
 ```bash
 # API
 cd server
-cp .env.example .env      # fill in MONGODB_URI, JWT_SECRET, GOOGLE_CLIENT_ID
+cp .env.example .env      # MONGODB_URI, JWT_SECRET, GOOGLE_CLIENT_ID, CLIENT_URL
 npm install
 npm run dev               # http://localhost:5000
 
 # Client (new terminal)
 cd client
-cp .env.example .env      # fill in VITE_GOOGLE_CLIENT_ID
+cp .env.example .env      # VITE_API_URL, VITE_GOOGLE_CLIENT_ID
 npm install
 npm run dev               # http://localhost:5173
 ```
 
 ## 3. Push to GitHub
-
 ```bash
-cd clock-me-out
-git init
-git add .
-git commit -m "Clock me Out MERN"
+git init && git add . && git commit -m "Clock me Out MERN"
 git branch -M main
-git remote add origin https://github.com/<you>/clock-me-out.git
-git push -u origin main
+git remote add origin https://github.com/<you>/<repo>.git
+git push -u origin main --force
 ```
 
 ## 4. Deploy to Vercel (two projects, one repo)
+**API:** Root Directory `server`. Env: `MONGODB_URI`, `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `CLIENT_URL` (the client URL, no trailing slash).
+**Client:** Root Directory `client`, framework Vite. Env: `VITE_API_URL` (`https://<api>.vercel.app/api`), `VITE_GOOGLE_CLIENT_ID`.
+Add the client URL to the Google OAuth Authorized JavaScript origins, then redeploy both.
 
-**API**: Vercel → Add New Project → import the repo → **Root Directory: `server`**.
-Environment variables: `MONGODB_URI`, `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `CLIENT_URL` (set after the client is deployed, e.g. `https://clock-me-out.vercel.app`).
-Test: `https://<api>.vercel.app/api/health` should return `{"ok":true}`.
-
-**Client**: import the same repo again → **Root Directory: `client`** (framework: Vite).
-Environment variables: `VITE_API_URL=https://<api>.vercel.app/api`, `VITE_GOOGLE_CLIENT_ID`.
-
-Finally add the client's Vercel URL to the Google OAuth **Authorized JavaScript origins** and to `CLIENT_URL` on the API project, then redeploy the API.
-
-## API overview
-
+## API
 | Route | Purpose |
 |---|---|
-| `POST /api/auth/google` | Verify Google ID token, return session JWT |
-| `GET/PATCH /api/auth/me` | Profile and settings |
-| `GET/PUT/DELETE /api/shift` | Today's shift (clock-in, target, breaks, running late, departure) |
-| `GET /api/logs`, `PUT/DELETE /api/logs/:date`, `POST /api/logs/bulk`, `DELETE /api/logs?month=` | Daily log |
-| `GET/PUT/DELETE /api/holidays…` | Holidays and absences |
-| `POST /api/import/excel` | Attendance `.xlsx` import |
-| `GET /api/data/backup`, `POST /api/data/restore`, `DELETE /api/data` | Backup, restore, flush |
+| `POST /api/auth/google` | Verify the Google ID token, return a session token |
+| `GET /api/auth/me` | Current user |
+| `GET /api/state` | The user's saved data (`data` is `null` until first save) |
+| `PUT /api/state` | Replace the user's saved data |
 
 ## Notes
-- The Excel importer is a best-effort parser: it finds a header row containing "Date", then an hours column (names like Worked, Effective, Total, Duration), an optional Target column and an optional Status column. If your sheet layout differs, adjust `server/src/lib/attendance.js`.
-- Alerts (sound and browser notifications) run in the browser, so the page has to stay open.
-- The session token is kept in `localStorage`. For stricter security, move it to an httpOnly cookie (needs `SameSite=None; Secure` across the two Vercel domains).
+- If two devices edit at the same time, the most recent save wins.
+- The session token lives in `localStorage` for 30 days. For stricter security, move it to an httpOnly cookie (needs `SameSite=None; Secure` across two Vercel domains).
+- To update the app itself later, edit `client/public/app.html` and keep the sync `<script>` at the top of `<head>`.
