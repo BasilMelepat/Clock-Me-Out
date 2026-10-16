@@ -4,6 +4,7 @@ import cors from "cors";
 import { connectDB } from "./db.js";
 import authRoutes from "./routes/auth.js";
 import stateRoutes from "./routes/state.js";
+import adminRoutes from "./routes/admin.js";
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use(async (_req, _res, next) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/state", stateRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.use((_req, res) => res.status(404).json({ error: "Not found" }));
 
