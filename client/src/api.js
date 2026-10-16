@@ -22,7 +22,7 @@ async function request(path, { method = "GET", body } = {}) {
     throw err;
   }
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && token) tokenStore.clear();
+  if ((res.status === 401 || res.status === 403) && token) tokenStore.clear();
   if (!res.ok) throw Object.assign(new Error(data.error || "Something went wrong"), { status: res.status });
   return data;
 }

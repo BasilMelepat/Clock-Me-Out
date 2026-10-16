@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import App from "./App.jsx";
+import Admin from "./Admin.jsx";
 import "./styles.css";
 
 // Same light/dark choice the app itself uses.
@@ -11,7 +12,12 @@ try {
 
 const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-createRoot(document.getElementById("root")).render(
+const root = createRoot(document.getElementById("root"));
+const isAdmin = /^\/admin\/?$/.test(window.location.pathname);
+
+if (isAdmin) {
+  root.render(<React.StrictMode><Admin /></React.StrictMode>);
+} else root.render(
   <React.StrictMode>
     {clientId ? (
       <GoogleOAuthProvider clientId={clientId}>

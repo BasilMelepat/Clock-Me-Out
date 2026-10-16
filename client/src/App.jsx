@@ -18,6 +18,9 @@ function applyServer(data) {
 export default function App() {
   const [phase, setPhase] = useState(tokenStore.get() ? "loading" : "login");
   const [error, setError] = useState("");
+  const [mode, setMode] = useState("signin"); // "signin" | "signup"
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [busy, setBusy] = useState(false);
   const started = useRef(false);
 
   // Download this account's data, then open the app.
@@ -48,7 +51,7 @@ export default function App() {
       localStorage.setItem("clk_api", API_BASE);
       window.location.replace("/app.html");
     } catch (e) {
-      if (!tokenStore.get()) return setPhase("login"); // session expired or rejected
+      if (!tokenStore.get()) { setError(e.message); return setPhase("login"); } // session expired, or the account was disabled
       if (e.network && localStorage.getItem("clk_api")) return window.location.replace("/app.html"); // offline: use what's on this device
       setError(e.message);
       setPhase("error");
@@ -72,6 +75,29 @@ export default function App() {
     }
   };
 
+  const submit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setBusy(true);
+    try {
+      const signup = mode === "signup";
+      const body = signup ? form : { email: form.email, password: form.password };
+      const { token } = await api.post(signup ? "/auth/register" : "/auth/login", body);
+      tokenStore.set(token);
+      enter();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const switchMode = (m) => {
+    setMode(m);
+    setError("");
+  };
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
   const dark = document.body.classList.contains("dark-mode");
 
   return (
@@ -84,7 +110,41 @@ export default function App() {
 
         {phase === "login" && (
           <>
-            <p className="muted">Sign in to save your shifts and daily log to your account and use them on any device.</p>
+            <div className="gate-tabs" role="tablist">
+              <button type="button" role="tab" aria-selected={mode === "signin"} onClick={() => switchMode("signin")}>Sign in</button>
+              <button type="button" role="tab" aria-selected={mode === "signup"} onClick={() => switchMode("signup")}>Sign up</button>
+            </div>
+
+            <form className="gate-form" onSubmit={submit}>
+              {mode === "signup" && (
+                <label>
+                  Name
+                  <input type="text" value={form.name} onChange={set("name")} maxLength={60} autoComplete="name" placeholder="Your name" />
+                </label>
+              )}
+              <label>
+                Email
+                <input type="email" value={form.email} onChange={set("email")} required autoComplete="email" placeholder="you@example.com" />
+              </label>
+              <label>
+                Password
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={set("password")}
+                  required
+                  minLength={mode === "signup" ? 8 : undefined}
+                  maxLength={128}
+                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                  placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
+                />
+              </label>
+              <button className="gate-submit" type="submit" disabled={busy}>
+                {busy ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}
+              </button>
+            </form>
+
+            <div className="gate-or"><span>or</span></div>
             <div className="gate-btn">
               <GoogleLogin
                 onSuccess={onGoogle}
@@ -92,6 +152,7 @@ export default function App() {
                 theme={dark ? "filled_black" : "outline"}
                 shape="pill"
                 size="large"
+                text={mode === "signup" ? "signup_with" : "signin_with"}
               />
             </div>
           </>
