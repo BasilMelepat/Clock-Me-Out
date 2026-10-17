@@ -1,4 +1,4 @@
-[README.md](https://github.com/user-attachments/files/33540009/README.md)
+[README.md](https://github.com/user-attachments/files/33592318/README.md)
 # Clock me Out (MERN)
 
 The original Clock me Out app, unchanged in look and behaviour, with Google sign-in and per-account cloud storage.
@@ -7,7 +7,7 @@ React (Vite) sign-in shell · Express API · MongoDB Atlas · deployable to Verc
 ```
 clock-me-out/
 ├── client/
-│   ├── public/app.html   the original app (v2.282) + a small sync script and a "Sign out" row in Settings
+│   ├── public/app.html   the original app (v2.287) + a small sync script and a "Sign out" row in Settings
 │   └── src/              React sign-in page (Google) that loads your data, then opens /app.html
 └── server/               Express API (runs as a Vercel serverless function)
 ```
