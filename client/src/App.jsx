@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import { api, API_BASE, tokenStore } from "./api.js";
+import Mascot from "./Mascot.jsx";
 
 // The app's own data keys (same ones its Backup feature uses). Everything else stays per device.
 const KEYS = ["cmoLogEntries", "cmoLogEntryCount", "cmoShiftState", "cmoHolidays", "cmoAbsent", "cmoUserName"];
@@ -21,6 +22,7 @@ export default function App() {
   const [mode, setMode] = useState("signin"); // "signin" | "signup"
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [busy, setBusy] = useState(false);
+  const [pwFocus, setPwFocus] = useState(false);
   const started = useRef(false);
 
   // Download this account's data, then open the app.
@@ -99,12 +101,14 @@ export default function App() {
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const dark = document.body.classList.contains("dark-mode");
+  // The mascot looks away shyly while a password is typed, and reacts to errors and loading.
+  const mood = error ? "surprised" : phase === "loading" ? "delighted" : pwFocus ? "bashful" : null;
 
   return (
     <main className="gate">
       <div className="card gate-card">
+        <div className="gate-mascot"><Mascot mood={mood} /></div>
         <div className="gate-brand">
-          <span className="gate-mark" aria-hidden="true">🖥️</span>
           <span className="gate-title">Clock me Out</span>
         </div>
 
@@ -136,6 +140,8 @@ export default function App() {
                   minLength={mode === "signup" ? 8 : undefined}
                   maxLength={128}
                   autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                  onFocus={() => setPwFocus(true)}
+                  onBlur={() => setPwFocus(false)}
                   placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
                 />
               </label>
