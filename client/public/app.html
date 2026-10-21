@@ -594,6 +594,13 @@
     transition: background .15s, color .15s;
   }
   .add-btn:hover { background: var(--sky); color: #fff; }
+  .stop-shift-btn { margin-bottom: 12px; color: #C0392B; border-color: rgba(224, 69, 60, 0.55); }
+  .stop-shift-btn:hover { background: #D64538; border-color: #D64538; color: #fff; }
+  body.dark-mode .stop-shift-btn { color: #FF8A80; border-color: rgba(255, 138, 128, 0.5); }
+  body.dark-mode .stop-shift-btn:hover { background: #E5645A; border-color: #E5645A; color: #0B1A2B; }
+  .new-shift-btn { margin-bottom: 12px; background: var(--sky); color: #fff; }
+  .new-shift-btn:hover { background: var(--deep2); border-color: var(--deep2); }
+  body.dark-mode .new-shift-btn, body.dark-mode .new-shift-btn:hover { color: #0B1A2B; }
   @keyframes gradientFlow {
     0% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
@@ -1882,11 +1889,10 @@
   .cal-view-toggle::before { content: ""; position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 999px; background: var(--card); box-shadow: 0 1px 4px rgba(11, 42, 74, 0.16), 0 0 0 1px var(--line) inset; transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
   .cal-view-toggle:has(#calViewList[aria-pressed="true"])::before { transform: translateX(100%); }
   body.dark-mode .cal-view-toggle::before { box-shadow: 0 0 0 1px var(--line) inset; }
-  .cal-view-toggle button { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0; text-transform: none; cursor: pointer; transition: color 0.2s; }
+  .cal-view-toggle button { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; min-width: 40px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0; text-transform: none; cursor: pointer; transition: color 0.2s; }
   .cal-view-toggle button:hover { color: var(--deep); }
   .cal-view-toggle button[aria-pressed="true"] { color: var(--sky); }
   .cal-view-toggle button:focus-visible { outline: 2px solid var(--sky); outline-offset: 1px; }
-  @media (max-width: 420px) { .cal-view-toggle button { padding: 0 11px; } .cal-view-toggle .tg-text { display: none; } }
   @media (prefers-reduced-motion: reduce) { .cal-view-toggle::before { transition: none; } }
   .cal-list { display: none; }
   #calendarViewPanel.mode-list .cal-list { display: block; }
@@ -1922,7 +1928,7 @@
     <span class="brand-mark" id="brandMark" aria-hidden="true">🖥️</span>
     <span class="brand-text">
       <span class="app-header-title" id="brandTitle" role="link" tabindex="0" title="Go to Shift Details">Clock me Out</span>
-      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v2.287</span><span class="user-chip" id="userChip" hidden></span></span>
+      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v2.293</span><span class="user-chip" id="userChip" hidden></span></span>
     </span>
   </div>
   <div class="view-bar" id="viewBar" data-view="overview">
@@ -1965,6 +1971,8 @@
           <button class="clear-btn x-btn" id="closeShiftBtn" type="button" style="display:none;" aria-label="Clear shift details" title="Clear"><span class="x-icon">❌</span></button>
         </span>
       </div>
+      <button class="add-btn stop-shift-btn" id="stopShiftBtn" type="button" style="display:none;">⏹️ Stop shift</button>
+      <button class="add-btn new-shift-btn" id="newShiftBtn" type="button" style="display:none;">🚀 Start a new shift</button>
       <button class="add-btn" id="addShiftBtn" type="button">➕ Add Shift Details</button>
       <div id="shiftBody" style="display:none;">
       <div class="log-input-card two-col shift-details-inputs">
@@ -2155,8 +2163,8 @@
         <span>📅 Calendar View</span>
         <div class="card-title-actions">
           <div class="cal-view-toggle" role="group" aria-label="Calendar layout">
-            <button id="calViewGrid" type="button" aria-pressed="true" title="Calendar grid" aria-label="Calendar grid"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/></svg><span class="tg-text">Calendar</span></button>
-            <button id="calViewList" type="button" aria-pressed="false" title="Day list" aria-label="Day list"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg><span class="tg-text">List</span></button>
+            <button id="calViewGrid" type="button" aria-pressed="true" title="Calendar grid" aria-label="Calendar grid"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/></svg></button>
+            <button id="calViewList" type="button" aria-pressed="false" title="Day list" aria-label="Day list"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg></button>
           </div>
         </div>
       </div>
@@ -2803,7 +2811,36 @@
   function startOfDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
   let shiftAnchor = startOfDay(new Date());
 
+  // Shift lifecycle: logging hours for the shift's day in the Daily Log ends the running shift
+  // (live counters freeze, the welcome message sends you home, a "Start a new shift" button appears).
+  let shiftEnded = false, shiftEndedAt = 0, endedPick = 0, pendingEnded = null;
+  const isoOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const shiftDayISO = () => isoOf(shiftAnchor);
+  // Marked holidays: remind that it's a day off and discourage starting a shift when there's no backlog to cover
+  const isTodayHoliday = () => holidays.has(isoOf(new Date()));
+  const isTomorrowOff = () => { const t = new Date(); t.setDate(t.getDate() + 1); return holidays.has(isoOf(t)) || isWeeklyOffDay(t.getDay()); };
+  const hasBacklogNow = () => Math.max(0, -getLogDiffSeconds() / 60) > 0.5 || (parseFloat(el.lateMinutes.value) || 0) >= 1;
+  const logForShiftDay = () => logEntries.find(e => e.date === shiftDayISO());
+  // Stop shift is offered only while a shift is actually running
+  function updateStopBtn() {
+    document.getElementById('stopShiftBtn').style.display = (shiftOpen && document.getElementById('clockIn').value && !shiftEnded) ? '' : 'none';
+  }
+  function setShiftEnded(on, at) {
+    shiftEnded = !!on;
+    shiftEndedAt = on ? (at || Date.now()) : 0;
+    if (on) endedPick = Math.floor(Math.random() * 3);
+    document.getElementById('newShiftBtn').style.display = on ? '' : 'none';
+    updateStopBtn();
+  }
+  function endShiftFromLog() {
+    if (shiftEnded || !document.getElementById('clockIn').value) return;
+    setShiftEnded(true);
+    calculate();
+    saveShiftStateNow();
+  }
+
   function calculate() {
+    updateStopBtn();
     const clockIn = el.clockIn.value;
     const targetHours = getTargetHours();
     const lateMinutes = parseFloat(el.lateMinutes.value) || 0;
@@ -2853,7 +2890,8 @@
     clockOutDate.setMinutes(clockOutDate.getMinutes() + targetWorkMin + totalBreakMin);
 
     renderFlipTime(timeEl, minutesToTimeStr(clockOutMin), { charClass: 'roll-char', animClass: 'roll-anim' });
-    errorEl.textContent = `🕘 Clocked in at ${minutesToTimeStr(clockInMin)}`;
+    const endedD = new Date(shiftEndedAt);
+    errorEl.textContent = shiftEnded ? `✅ Shift ended at ${minutesToTimeStr(endedD.getHours() * 60 + endedD.getMinutes())}` : `🕘 Clocked in at ${minutesToTimeStr(clockInMin)}`;
     renderFlipTime(workOut, formatDuration(targetWorkMin));
     renderFlipTime(breakOut, totalBreakMin > 0 ? formatDuration(totalBreakMin) : 'Not taken');
 
@@ -2902,7 +2940,8 @@
         breaks: breaks,
         savedAt: Date.now(),
         anchor: shiftAnchor.getTime(),
-        endsAt: (document.getElementById('clockIn').value && state.clockOutDate) ? state.clockOutDate.getTime() : null
+        endsAt: (document.getElementById('clockIn').value && state.clockOutDate && !shiftEnded) ? state.clockOutDate.getTime() : null,
+        ended: shiftEnded ? shiftEndedAt : null
       };
       localStorage.setItem('cmoShiftState', JSON.stringify(snapshot));
     } catch (e) { /* storage unavailable, fail silently */ }
@@ -2916,6 +2955,7 @@
     document.getElementById('addShiftBtn').style.display = open ? 'none' : '';
     document.getElementById('shiftCard').classList.toggle('shift-attention', !open);
     document.getElementById('closeShiftBtn').style.display = open ? 'inline-block' : 'none';
+    updateStopBtn();
   }
 
   function showResultCard(show) {
@@ -2931,12 +2971,14 @@
   // (lines with ", {name}" or "{name}, " just drop it).
   const GREETINGS = {
     dawn:    [['Rise and shine, {name}', '🌅'], ['Early bird mode, {name}', '🐦'], ['{name}, fresh start ahead', '🌱', 'Fresh start ahead'], ['Up before the sun, {name}', '☀️']],
-    morning: [['Let\'s get it, {name}', '🚀'], ['Look who\'s here, {name}', '😎'], ['Cape on, {name}', '🦸']],
+    morning: [['Let\'s get it, {name}', '🚀'], ['Look who\'s back, my {name}', '😎', 'Look who\'s back'], ['Cape on, {name}', '🦸']],
     lunch:   [['Lunch break unlocked, {name}', '🔓'], ['Feed the engine, {name}', '🍔'], ['Halftime, {name}', '🏆'], ['Fork in hand, {name}', '🍴'], ['{name}, your stomach says hi', '👋']],
     midday:  [['Power hour, {name}', '⚡'], ['{name} is in the zone', '🎯', 'In the zone'], ['Keep the momentum, {name}', '🔥'], ['Cruising along, {name}', '😎']],
     evening: [['Final stretch, {name}', '🏁'], ['Golden hour, {name}', '🌇'], ['Finish strong, {name}', '💪'], ['Almost there, {name}', '🎉']],
     night:   [['Night owl mode, {name}', '🦉'], ['Burning the midnight oil, {name}', '🌙'], ['Still going strong, {name}', '🌠'], ['Moonlight shift, {name}', '🌃']],
     friday:  [['Friday energy, {name}', '🎉'], ['{name}, almost the weekend', '🥳', 'Almost the weekend'], ['Weekend loading, {name}', '🕺']],
+    // Friday has two sets: weekend wording only when the next day (Saturday) is a marked holiday
+    fridayWork: [['Friday energy, {name}', '🎉'], ['Fri-yay, {name}', '🙌'], ['Friday mode on, {name}', '😎'], ['Strong Friday, {name}', '💪']],
     weekend: [['Weekend warrior, {name}', '🛡️'], ['Bonus round, {name}', '🎮'], ['Dedicated, aren\'t you, {name}', '🫡']],
     // Shift-progress lines: these take over from the time-of-day lines as the clock-out time gets close (or passes)
     near60:  [['Home stretch, {name}', '🏁'], ['Last hour, {name}, let\'s go', '⏱️', 'Last hour, let\'s go'], ['One hour to freedom, {name}', '🕊️']],
@@ -2945,6 +2987,8 @@
     done:    [['Target smashed, {name}', '🏆'], ['Mission complete, {name}', '🎯'], ['{name} clocked out in spirit', '🫡', 'Clocked out in spirit']],
     over30:  [['Overtime hero, {name}', '🦸'], ['Bonus minutes, {name}', '🎁'], ['Go home, {name}, you legend', '🏠', 'Go home, you legend']],
     over120: [['Seriously, {name}, go home', '🫠', 'Seriously, go home'], ['Absolute workhorse, {name}', '🐴'], ['Touch grass, {name}', '🌱']],
+    holiday: [['Holiday vibes, {name}', '🌴'], ['Day off, {name}', '🏖️'], ['Rest up, {name}', '😴'], ['Enjoy the break, {name}', '🎈']],
+    ended:   [['Go home, {name}', '🏡', 'Go home'], ['Family time, {name}', '👨‍👩‍👧', 'Family time'], ['Day done, {name}', '✅', 'Day done'], ['Off you go, {name}', '🚪', 'Off you go']],
     payback: [['Backlog buster, {name}', '💪'], ['{name} is paying it back', '🏦', 'Paying it back'], ['Clearing the slate, {name}', '🧹']]
   };
 
@@ -3067,7 +3111,7 @@
   function rescheduleSounds() {
     Object.values(soundTimers).forEach(clearTimeout);
     soundTimers = {};
-    if (!document.getElementById('clockIn').value || !state.clockOutDate) return;
+    if (shiftEnded || !document.getElementById('clockIn').value || !state.clockOutDate) return;
     const nowMs = Date.now();
     const sched = (key, atMs, name) => {
       const wait = atMs - nowMs;
@@ -3092,6 +3136,7 @@
     return (state.clockOutDate.getTime() - now.getTime()) / 60000;
   }
   function targetPhase(now) {
+    if (shiftEnded) return 'ended';
     const m = minutesToClockOut(now);
     if (m === null || m > 60) return null;
     if (m > 30) return 'near60';
@@ -3115,9 +3160,28 @@
 
     // No shift yet
     if (!document.getElementById('clockIn').value || !state.clockInDate || !state.clockOutDate) {
+      if (isTodayHoliday()) {
+        setWelcomeLine(behind > 0.5 || late >= 1
+          ? `Today is marked as a holiday. You're ${fmtSpan(Math.max(behind, late))} behind this month, so start a shift only if you want to catch up.`
+          : 'Today is marked as a holiday and you have no backlog. Enjoy your day off, there is no need to start a shift 🌴');
+        return;
+      }
       const base = 'Add your shift details to begin the day.';
       setWelcomeLine(behind > 0.5 ? `${base} You're ${fmtSpan(behind)} behind this month, add it as backlog to catch up.`
         : ahead > 0.5 ? `${base} You're ${fmtSpan(ahead)} ahead this month, an early departure is on the table.` : base);
+      return;
+    }
+
+    // Shift ended by logging the day: send them home
+    if (shiftEnded) {
+      const e = logForShiftDay();
+      const logged = e ? fmtSpan(entrySeconds(e) / 60) : null;
+      const lines = [
+        `Shift ended${logged ? `, ${logged} logged` : ''}. If you're still in the office, head home to your family now 🏡`,
+        `${logged ? `${logged} logged, great work today.` : 'Great work today.'} Close the laptop and go home to your family.`,
+        `Day complete${logged ? ` with ${logged} in the books` : ''}. Your family is waiting, time to head home!`
+      ];
+      setWelcomeLine(lines[endedPick % lines.length]);
       return;
     }
 
@@ -3143,7 +3207,8 @@
 
     // Shift running
     const inStr = timeStr(state.clockInDate);
-    let line = m <= 60 ? `${fmtSpan(m)} to go.` : `Clocked in at ${inStr}.`;
+    const holidayNote = isTodayHoliday() ? (behind > 0.5 || late >= 1 ? 'Holiday today, but you have backlog to cover. ' : 'Holiday today and no backlog, you could head home. ') : '';
+    let line = holidayNote + (m <= 60 ? `${fmtSpan(m)} to go.` : `Clocked in at ${inStr}.`);
     line += late >= 1 ? ` Clock-out at ${outStr}, with ${fmtSpan(late)} backlog added.` : ` Clock-out at ${outStr}.`;
     if (late >= 1) {
       if (pending > 0.5) line += ` ${fmtSpan(pending)} more is not added yet, use the Log chip to add it.`;
@@ -3168,11 +3233,12 @@
       if (greetingPick.slot !== phase) { const l = GREETINGS[phase]; greetingPick = { slot: phase, line: l[Math.floor(Math.random() * l.length)] }; }
       return greetingPick.line;
     }
-    let slot = h >= 4 && h < 8 ? 'dawn' : h >= 8 && h < 12 ? 'morning' : h >= 12 && h < 14 ? 'lunch' : h >= 14 && h < 17 ? 'midday' : h >= 17 && h < 21 ? 'evening' : 'night';
+    let slot = isTodayHoliday() && !document.getElementById('clockIn').value ? 'holiday' : h >= 4 && h < 8 ? 'dawn' : h >= 8 && h < 12 ? 'morning' : h >= 12 && h < 14 ? 'lunch' : h >= 14 && h < 17 ? 'midday' : h >= 17 && h < 21 ? 'evening' : 'night';
     // Lunch (12-14) wins on every day; weekend / Friday lines only override the other slots
-    if (slot !== 'lunch') {
-      if ((day === 0 || day === 6) && slot !== 'night') slot = 'weekend';
-      else if (day === 5 && (slot === 'midday' || slot === 'evening')) slot = 'friday';
+    if (slot !== 'lunch' && slot !== 'holiday') {
+      // Weekend lines only when the day is really off: Sundays, or a Saturday marked as a holiday (a working Saturday gets the normal lines)
+      if ((day === 0 || (day === 6 && isTodayHoliday())) && slot !== 'night') slot = 'weekend';
+      else if (day === 5 && (slot === 'midday' || slot === 'evening')) slot = isTomorrowOff() ? 'friday' : 'fridayWork';
     }
     if (greetingPick.slot !== slot) {
       const list = GREETINGS[slot];
@@ -3220,13 +3286,14 @@
       if (!state || typeof state.savedAt !== 'number') return;
       const savedToday = localDateKey(new Date(state.savedAt)) === localDateKey(new Date());
       // A shift saved on an earlier day is dropped, unless it is an overnight shift that has not reached its clock-out yet
-      const stillRunning = typeof state.endsAt === 'number' && state.endsAt > Date.now();
+      const stillRunning = typeof state.endsAt === 'number' && state.endsAt > Date.now() && typeof state.ended !== 'number';
       if (!savedToday && !stillRunning) {
         localStorage.removeItem('cmoShiftState');
         return;
       }
       shiftAnchor = startOfDay(new Date(typeof state.anchor === 'number' ? state.anchor : state.savedAt));
       if (state.clockIn) { document.getElementById('clockIn').value = state.clockIn; setShiftOpen(true); }
+      if (typeof state.ended === 'number' && state.clockIn) pendingEnded = state.ended; // applied once the Daily Log has loaded
       if (state.targetHours) { document.getElementById('targetHours').value = state.targetHours; capTargetHours(); normalizeTargetHours(); }
       if (Array.isArray(state.breaks)) {
         breaksContainer.innerHTML = '';
@@ -3316,6 +3383,8 @@
   document.getElementById('targetHours').addEventListener('input', () => { calculate(); saveShiftState(); });
 
   document.getElementById('addShiftBtn').addEventListener('click', () => {
+    if (isTodayHoliday() && !document.getElementById('clockIn').value && !hasBacklogNow() &&
+        !confirm('Today is marked as a holiday and you have no backlog to cover. Start a shift anyway?')) return;
     setShiftOpen(true);
     const clockInInput = document.getElementById('clockIn');
     if (!clockInInput.value) { shiftAnchor = startOfDay(new Date()); const n = new Date(); clockInInput.value = minutesToInputTime(n.getHours() * 60 + n.getMinutes()); } // default clock-in = right now
@@ -3326,6 +3395,7 @@
 
   // ❌ clears today's clock-in and breaks, folds the card back and hides the Clock-Out Time card (target hours stay)
   function clearShiftToday() {
+    setShiftEnded(false);
     document.getElementById('clockIn').value = '';
     breaksContainer.innerHTML = '';
     breakCount = 0;
@@ -3335,6 +3405,44 @@
     saveShiftStateNow();
   }
   document.getElementById('closeShiftBtn').addEventListener('click', clearShiftToday);
+
+  // Stop shift: log the hours worked so far (elapsed minus breaks) into today's Daily Log entry and end the shift.
+  // A second shift on the same day adds to that day's entry, like adding hours by hand.
+  document.getElementById('stopShiftBtn').addEventListener('click', () => {
+    if (shiftEnded || !document.getElementById('clockIn').value || !state.clockInDate) return;
+    const elapsedMin = Math.max(0, (Date.now() - state.clockInDate.getTime()) / 60000);
+    const workedSec = Math.floor(Math.max(0, elapsedMin - Math.min(state.totalBreakMin, elapsedMin)) * 60);
+    if (workedSec < 60) {
+      if (confirm('Less than a minute has been worked, so there is nothing to log. Discard this shift?')) clearShiftToday();
+      return;
+    }
+    const date = shiftDayISO();
+    const target = Math.max(0, Math.min(MAX_TARGET_HOURS, Math.round(getTargetHours())));
+    const existing = logEntries.find(e => e.date === date);
+    if (existing) {
+      const total = Math.min(MAX_CLOCKED_SECONDS, entrySeconds(existing) + workedSec);
+      existing.hh = Math.floor(total / 3600); existing.mm = Math.floor((total % 3600) / 60); existing.ss = total % 60;
+      existing.target = target;
+    } else {
+      const secs = Math.min(MAX_CLOCKED_SECONDS, workedSec);
+      logEntryCount++;
+      logEntries.push({ id: logEntryCount, hh: Math.floor(secs / 3600), mm: Math.floor((secs % 3600) / 60), ss: secs % 60, target, date });
+    }
+    const [dy, dm] = date.split('-').map(Number);
+    calendarYear = dy;
+    calendarMonth = dm - 1;
+    followMonthInMyMonth(dy, dm - 1);
+    endShiftFromLog(); // freezes the counters at this moment and sends you home
+    renderLogList();
+    calculateLog();
+    saveLogEntries();
+  });
+
+  // Start a new shift: wipe the ended one and clock in right now
+  document.getElementById('newShiftBtn').addEventListener('click', () => {
+    clearShiftToday();
+    document.getElementById('addShiftBtn').click();
+  });
 
   // ========================================================================
   // 3. LIVE CLOCK & LAYOUT
@@ -3498,7 +3606,16 @@
         setAttrIfChanged(clockEls.progress2, 'd', clockArc(CLOCK_RING2_R, startDeg, Math.min(Math.max(0, el - 720), Math.max(0, totalMin - 720)) * 0.5));
       };
 
-      if (elapsedMin < 0) {
+      if (shiftEnded) {
+        // Hours were logged for this day: the dial freezes where the shift ended and the countdown stops
+        setProgress(Math.max(0, Math.min(totalMin, (shiftEndedAt - inD.getTime()) / 60000)));
+        setAttrIfChanged(clockEls.overtime, 'd', '');
+        setAttrIfChanged(clockEls.overtime2, 'd', '');
+        stateClass = 'clock-done';
+        pillClass += ' done';
+        pillText = 'Shift ended ✅';
+        infoText = 'Time to go home 🏡';
+      } else if (elapsedMin < 0) {
         setProgress(0);
         setAttrIfChanged(clockEls.overtime, 'd', '');
         setAttrIfChanged(clockEls.overtime2, 'd', '');
@@ -3583,11 +3700,11 @@
       return;
     }
 
-    const now = new Date();
+    const now = shiftEnded ? new Date(shiftEndedAt) : new Date(); // an ended shift stays frozen at the moment it ended
     const remainingSec = (state.clockOutDate - now) / 1000;
     const elapsedSec = Math.max(0, (now - state.clockInDate) / 1000);
 
-    if (remainingSec <= 0) {
+    if (remainingSec <= 0 && !shiftEnded) {
       if (!resultCard.classList.contains('exceeded')) {
         resultCard.classList.add('exceeded', 'flip-pulse');
         setTimeout(() => resultCard.classList.remove('flip-pulse'), 500);
@@ -3617,7 +3734,7 @@
   let lastDayKey = localDateKey(new Date());
   function midnightRollover() {
     if (!document.getElementById('clockIn').value) { shiftAnchor = startOfDay(new Date()); return; }
-    if (state.clockOutDate && state.clockOutDate > new Date()) return;
+    if (state.clockOutDate && state.clockOutDate > new Date() && !shiftEnded) return;
     clearShiftToday();
   }
 
@@ -3899,6 +4016,7 @@
       localStorage.setItem('cmoLogEntries', JSON.stringify(logEntries));
       localStorage.setItem('cmoLogEntryCount', String(logEntryCount));
     } catch (e) { /* storage unavailable, fail silently */ }
+    if (shiftEnded && !logForShiftDay()) { setShiftEnded(false); calculate(); saveShiftStateNow(); } // the day's log was removed: the shift runs again
   }
 
   function loadLogEntriesFromStorage() {
@@ -4170,6 +4288,7 @@
       logDuration.focus();
     }
 
+    if (date === shiftDayISO()) endShiftFromLog(); // logging the shift's day ends the running shift
     const [dy, dm] = date.split('-').map(Number);
     calendarYear = dy;
     calendarMonth = dm - 1;
@@ -5873,6 +5992,8 @@
   loadShiftStateFromStorage();
 
   loadLogEntriesFromStorage();
+  if (pendingEnded && logForShiftDay()) setShiftEnded(true, pendingEnded); // the shift's day is still logged: it stays ended
+  pendingEnded = null;
 
   renderLogList();
 
