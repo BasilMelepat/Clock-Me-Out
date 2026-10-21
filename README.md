@@ -1,4 +1,4 @@
-[README.md](https://github.com/user-attachments/files/33592318/README.md)
+[README.md](https://github.com/user-attachments/files/33751697/README.md)
 # Clock me Out (MERN)
 
 The original Clock me Out app, unchanged in look and behaviour, with Google sign-in and per-account cloud storage.
@@ -7,7 +7,7 @@ React (Vite) sign-in shell · Express API · MongoDB Atlas · deployable to Verc
 ```
 clock-me-out/
 ├── client/
-│   ├── public/app.html   the original app (v2.287) + a small sync script and a "Sign out" row in Settings
+│   ├── public/app.html   the original app (v2.293) + a small sync script and a "Sign out" row in Settings
 │   └── src/              React sign-in page (Google) that loads your data, then opens /app.html
 └── server/               Express API (runs as a Vercel serverless function)
 ```
@@ -72,6 +72,9 @@ Open `https://<your-client>/admin`. Sign in with `ADMIN_EMAIL` and `ADMIN_PASSWO
 - Admin sessions last 8 hours and end when the tab closes. 5 wrong passwords from one IP lock admin sign-in for 15 minutes.
 - Privacy: the dashboard shows summaries (days logged, last saved), never a person's actual entries.
 - A disabled user is signed out and blocked on their next request.
+
+## Credits
+The mascot is based on [page-mascot](https://github.com/nilbuild/page-mascot) (MIT License, © Kamran Ahmed). Its sprite sheets are in `client/public/mascot-*.webp`.
 
 ## Notes
 - One account per email: a Google account and a password account with the same email are not merged. Passwords are hashed with scrypt; 8 failed sign-ins lock that account for 15 minutes.
