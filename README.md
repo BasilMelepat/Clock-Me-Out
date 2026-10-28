@@ -1,4 +1,4 @@
-[README.md](https://github.com/user-attachments/files/34075347/README.md)
+[README.md](https://github.com/user-attachments/files/34075916/README.md)
 # Clock me Out
 
 Work-hours and clock-out calculator. Sign in, and your shifts and daily log are saved to your account and follow you to every device.
@@ -7,7 +7,7 @@ React sign-in page · Express API · MongoDB.
 ```
 clock-me-out/
 ├── client/
-│   ├── public/app.html   the Clock me Out app (v3.0.0) with cloud sync and a "Sign out" row in Settings
+│   ├── public/app.html   the Clock me Out app (v3.2.0) with cloud sync and a "Sign out" row in Settings
 │   └── src/              sign-in page (Google or email) and the admin dashboard
 └── server/               Express API
 ```
@@ -24,7 +24,8 @@ Signing out is under **Settings → Cloud sync → Sign out**.
 2. A sync engine saves the app's six data keys (logs, shift, holidays, absences, name) to your account a moment after every change, and when you leave the page.
 3. The header **cloud button** and **Settings → Cloud sync** show the status: tap to sync now, **Upload** to overwrite the cloud copy with this device, **Restore** to replace this device with the cloud copy.
 4. Coming back to a tab picks up changes from other devices. If this device and the cloud both changed, nothing is overwritten and you choose Upload or Restore.
-5. Theme, pointer effects and sound stay per device.
+5. Main actions (starting or stopping a shift, adding breaks, logging days, holidays, backup, name) show a short toast message. In the admin dashboard, disabling, enabling, unlocking and deleting do too.
+6. Theme, pointer effects and sound stay per device.
 
 ## Moving your existing data over
 On the old site: Settings → Backup → **Download backup**.
@@ -53,12 +54,12 @@ Open **https://clock-me-out.vercel.app/admin** and sign in with the admin email 
 | `PUT /api/state` | Replace the user's saved data |
 
 ## Versioning
-MAJOR.MINOR.PATCH, shown in the header badge (for example v3.0.0).
+MAJOR.MINOR.PATCH, shown in the header badge (for example v3.2.0).
 - **MAJOR:** a big redesign or a change that breaks saved data.
 - **MINOR:** a new feature.
 - **PATCH:** a fix or small tweak.
 
-To release, change the number in the badge (`id="versionBadge"` in `client/public/app.html`).
+Every release changes the number, including admin-only and server changes. To release, change the number in the badge (`id="versionBadge"` in `client/public/app.html`).
 
 ## Credits
 The mascot is based on [page-mascot](https://github.com/nilbuild/page-mascot) (MIT License, © Kamran Ahmed). Its sprite sheets are in `client/public/mascot-*.webp`.
