@@ -128,6 +128,7 @@ export default function App() {
               <button type="button" role="tab" aria-selected={mode === "signup"} onClick={() => switchMode("signup")}>Sign up</button>
             </div>
 
+            {mode === "signup" && <p className="muted small gate-note">Your hours stay private to you, except the site admin can see summaries such as days logged and whether you are ahead of or behind target.</p>}
             <form className="gate-form" onSubmit={submit}>
               {mode === "signup" && (
                 <label>
