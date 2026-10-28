@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { adminApi, adminToken } from "./adminApi.js";
 import Mascot from "./Mascot.jsx";
 
@@ -92,6 +92,9 @@ function Dashboard({ onLogout }) {
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState("");
   const [me, setMe] = useState("");
+  const [note, setNote] = useState("");
+  const noteTimer = useRef(0);
+  const flash = (msg) => { setNote(msg); clearTimeout(noteTimer.current); noteTimer.current = setTimeout(() => setNote(""), 2800); };
   const today = localDay();
   const [month, setMonth] = useState(today.slice(0, 7));
   const [att, setAtt] = useState(null);
@@ -111,17 +114,17 @@ function Dashboard({ onLogout }) {
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
   const refresh = () => { loadStats(); loadRecent(); loadUsers(); loadAtt(); };
-  const run = async (fn) => {
+  const run = async (fn, msg) => {
     setError("");
-    try { await fn(); refresh(); } catch (e) { setError(e.message); }
+    try { await fn(); refresh(); if (msg) flash(msg); } catch (e) { setError(e.message); }
   };
   const toggleDisabled = (u) =>
     window.confirm(u.disabled ? `Enable ${u.email}?` : `Disable ${u.email}? They will be signed out and blocked.`) &&
-    run(() => adminApi.patch(`/users/${u.id}`, { disabled: !u.disabled }));
-  const unlock = (u) => run(() => adminApi.post(`/users/${u.id}/unlock`));
+    run(() => adminApi.patch(`/users/${u.id}`, { disabled: !u.disabled }), u.disabled ? `✅ ${u.email} enabled` : `🚫 ${u.email} disabled`);
+  const unlock = (u) => run(() => adminApi.post(`/users/${u.id}/unlock`), `🔓 ${u.email} unlocked`);
   const remove = (u) =>
     window.confirm(`Permanently delete ${u.email} and all of their saved data? This can't be undone.`) &&
-    run(async () => { await adminApi.del(`/users/${u.id}`); setDetail(null); });
+    run(async () => { await adminApi.del(`/users/${u.id}`); setDetail(null); }, `🗑️ ${u.email} deleted`);
 
   const s = stats;
   const googlePct = s ? pct(s.google, s.total) : 0;
@@ -154,7 +157,7 @@ function Dashboard({ onLogout }) {
       <main className="adm-main">
         <header className="adm-top">
           <div><h1>{title[0]}</h1><p className="muted">{title[1]}</p></div>
-          <button className="a-btn" onClick={refresh}>↻ Refresh</button>
+          <button className="a-btn" onClick={() => { refresh(); flash("↻ Refreshed"); }}>↻ Refresh</button>
         </header>
 
         {error && <p className="admin-error" role="alert">{error}</p>}
@@ -278,6 +281,7 @@ function Dashboard({ onLogout }) {
         )}
       </main>
 
+      {note && <div className="a-toast" role="status">{note}</div>}
       {detail && <Detail id={detail} onClose={() => setDetail(null)} onChanged={refresh} setError={setError} />}
     </div>
   );
