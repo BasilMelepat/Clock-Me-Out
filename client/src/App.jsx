@@ -6,7 +6,13 @@ import Mascot from "./Mascot.jsx";
 // The app's own data keys (same ones its Backup feature uses). Everything else stays per device.
 const KEYS = ["cmoLogEntries", "cmoLogEntryCount", "cmoShiftState", "cmoHolidays", "cmoAbsent", "cmoUserName"];
 
-const norm = (o) => JSON.stringify(KEYS.filter((k) => o && typeof o[k] === "string").map((k) => [k, o[k]]));
+// The shift state has a savedAt timestamp that changes on every save; it doesn't count as a change.
+const strip = (k, v) => {
+  if (k !== "cmoShiftState") return v;
+  try { const o = JSON.parse(v); if (o && typeof o === "object") { delete o.savedAt; return JSON.stringify(o); } } catch { /* keep as is */ }
+  return v;
+};
+const norm = (o) => JSON.stringify(KEYS.filter((k) => o && typeof o[k] === "string").map((k) => [k, strip(k, o[k])]));
 const snapshot = () => Object.fromEntries(KEYS.map((k) => [k, localStorage.getItem(k)]).filter(([, v]) => v !== null));
 const readJSON = (k) => { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch { return null; } };
 const writeJSON = (k, v) => localStorage.setItem(k, JSON.stringify(v));
@@ -14,6 +20,8 @@ const writeJSON = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 function applyServer(data) {
   KEYS.forEach((k) => (typeof data[k] === "string" ? localStorage.setItem(k, data[k]) : localStorage.removeItem(k)));
   writeJSON("clk_synced", data);
+  localStorage.setItem("clk_last", String(Date.now()));
+  localStorage.removeItem("clk_pending");
 }
 
 export default function App() {
@@ -48,6 +56,7 @@ export default function App() {
         if (Object.keys(seed).length) await api.put("/state", { data: seed });
         writeJSON("clk_synced", seed);
       }
+      localStorage.setItem("clk_last", String(Date.now()));
       localStorage.setItem("clk_uid", user.id);
       writeJSON("clk_user", { name: user.name, email: user.email });
       localStorage.setItem("clk_api", API_BASE);
