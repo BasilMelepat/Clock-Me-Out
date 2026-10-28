@@ -168,6 +168,69 @@ router.post("/users/:id/unlock", wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// ---- Attendance: who logged what, who is running late, who is ahead ----
+// Built from each person's saved daily log. A day is "short" when clocked time is under that day's target.
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+const DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+const parseList = (raw) => { try { const v = JSON.parse(raw); return Array.isArray(v) ? v : []; } catch { return []; } };
+const secsOf = (e) => (Number(e.hh) || 0) * 3600 + (Number(e.mm) || 0) * 60 + (Number(e.ss) || 0);
+const who = (u) => ({ id: String(u._id), name: u.name || "", email: u.email, picture: u.picture || "" });
+
+async function scanAttendance(visit) {
+  const users = new Map((await User.find().select("name email picture").lean()).map((u) => [String(u._id), u]));
+  const cursor = AppState.find({}).select("user data.cmoLogEntries data.cmoHolidays data.cmoAbsent").lean().cursor();
+  for await (const st of cursor) {
+    const u = users.get(String(st.user));
+    if (!u) continue;
+    visit(u, {
+      logs: parseList(st.data?.cmoLogEntries).filter((e) => e && typeof e.date === "string"),
+      holidays: parseList(st.data?.cmoHolidays).filter((d) => typeof d === "string"),
+      absent: parseList(st.data?.cmoAbsent).filter((d) => typeof d === "string"),
+    });
+  }
+}
+
+router.get("/attendance", wrap(async (req, res) => {
+  const month = MONTH_RE.test(req.query.month || "") ? req.query.month : new Date().toISOString().slice(0, 7);
+  const days = {};
+  const people = [];
+  const bump = (date, key) => { (days[date] ||= { logged: 0, onTarget: 0, short: 0, holiday: 0, absent: 0 })[key]++; };
+
+  await scanAttendance((u, d) => {
+    let balance = 0, count = 0;
+    for (const e of d.logs) {
+      if (!e.date.startsWith(month)) continue;
+      const clocked = secsOf(e), target = (Number(e.target) || 0) * 3600;
+      balance += clocked - target; count++;
+      bump(e.date, "logged"); bump(e.date, clocked >= target ? "onTarget" : "short");
+    }
+    d.holidays.filter((x) => x.startsWith(month)).forEach((x) => bump(x, "holiday"));
+    d.absent.filter((x) => x.startsWith(month)).forEach((x) => bump(x, "absent"));
+    if (count) people.push({ ...who(u), balanceSec: balance, days: count });
+  });
+
+  const late = people.filter((p) => p.balanceSec < 0).sort((a, b) => a.balanceSec - b.balanceSec);
+  const ahead = people.filter((p) => p.balanceSec > 0).sort((a, b) => b.balanceSec - a.balanceSec);
+  res.json({
+    month, days,
+    totals: { people: people.length, late: late.length, ahead: ahead.length, even: people.length - late.length - ahead.length },
+    late: late.slice(0, 10), ahead: ahead.slice(0, 10),
+  });
+}));
+
+router.get("/attendance/day", wrap(async (req, res) => {
+  const date = String(req.query.date || "");
+  if (!DATE_RE.test(date)) return res.status(400).json({ error: "date must be YYYY-MM-DD" });
+  const logged = [], off = [];
+  await scanAttendance((u, d) => {
+    for (const e of d.logs) if (e.date === date) logged.push({ ...who(u), clockedSec: secsOf(e), targetSec: (Number(e.target) || 0) * 3600 });
+    if (d.holidays.includes(date)) off.push({ ...who(u), type: "holiday" });
+    else if (d.absent.includes(date)) off.push({ ...who(u), type: "absent" });
+  });
+  logged.sort((a, b) => (a.clockedSec - a.targetSec) - (b.clockedSec - b.targetSec)); // most behind first
+  res.json({ date, logged, off });
+}));
+
 router.delete("/users/:id", wrap(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: "Invalid user id" });
   const user = await User.findByIdAndDelete(req.params.id).lean();
