@@ -235,6 +235,9 @@ body.dark-mode .adm-nav .count.warn { color: #FF8A80; }
 .gate-note { margin: -6px 0 12px; text-align: left; }
 @media (max-width: 860px) { .att-grid, .adm-row2 { grid-template-columns: 1fr; } .say .mascot { --mascot-size: 64px; } }
 
+.a-toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 70; max-width: 90vw; padding: 11px 18px; border-radius: 12px; background: var(--deep); color: var(--card); font-size: 14px; font-weight: 600; box-shadow: 0 10px 30px rgba(11, 42, 74, 0.28); animation: a-toast-in 0.25s ease; }
+@keyframes a-toast-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
 /* Mascot on the sign-in page (same CRT character as the app) */
 .mascot { --mascot-size: 112px; position: relative; display: block; flex: none; width: var(--mascot-size); height: var(--mascot-size); padding: 0; border: 0; background: transparent; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; appearance: none; }
 .mascot:focus-visible { outline: 2px solid var(--sky); outline-offset: 4px; border-radius: 16px; }
