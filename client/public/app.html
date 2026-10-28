@@ -2013,6 +2013,8 @@
     body.kb-open { padding-bottom: 16px; }
   }
 
+  /* ===== v3.2.0: toast messages for the main actions (shift, breaks, log, holidays, settings, backup) and in the admin dashboard ===== */
+  /* ===== v3.1.0: admin Attendance (calendar, running late, ahead) and mascot tips; sign-up form notes what the admin can see ===== */
   /* ===== v3.0.0: accounts (Google or email) with cloud sync to the database; Settings is three responsive columns ===== */
   /* ===== v2.295: cloud sync ===== */
   .header-actions .cloud-btn { position: relative; }
@@ -2061,7 +2063,7 @@
     <span class="brand-mark" id="brandMark" aria-hidden="true">🖥️</span>
     <span class="brand-text">
       <span class="app-header-title" id="brandTitle" role="link" tabindex="0" title="Go to Shift Details">Clock me Out</span>
-      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.0.0</span></span>
+      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.2.0</span></span>
     </span>
   </div>
   <div class="view-bar" id="viewBar" data-view="overview">
@@ -3498,13 +3500,14 @@
     saveShiftStateNow();
   }
 
-  addBreakBtn.addEventListener('click', () => { addBreak(); calculate(); saveShiftState(); });
+  addBreakBtn.addEventListener('click', () => { addBreak(); calculate(); saveShiftState(); toast('☕ Break added'); });
 
   document.getElementById('clearBreaksBtn').addEventListener('click', () => {
     const count = breaksContainer.querySelectorAll('.break-row').length;
     if (count > 1 && !confirm(`Remove all ${count} breaks? This can't be undone.`)) {
       return;
     }
+    toast(`🧹 Cleared ${count} break${count === 1 ? '' : 's'}`);
     breaksContainer.innerHTML = '';
     breakCount = 0;
     updateClearBreaksVisibility();
@@ -3542,10 +3545,12 @@
         !confirm('Today is marked as a holiday and you have no backlog to cover. Start a shift anyway?')) return;
     setShiftOpen(true);
     const clockInInput = document.getElementById('clockIn');
+    const startedNow = !clockInInput.value;
     if (!clockInInput.value) { shiftAnchor = startOfDay(new Date()); const n = new Date(); clockInInput.value = minutesToInputTime(n.getHours() * 60 + n.getMinutes()); } // default clock-in = right now
     calculate();
     saveShiftStateNow();
     clockInInput.focus();
+    if (startedNow) toast('🕘 Shift started at ' + clockInInput.value);
   });
 
   // ❌ clears today's clock-in and breaks, folds the card back and hides the Clock-Out Time card (target hours stay)
@@ -3559,7 +3564,7 @@
     calculate();
     saveShiftStateNow();
   }
-  document.getElementById('closeShiftBtn').addEventListener('click', clearShiftToday);
+  document.getElementById('closeShiftBtn').addEventListener('click', () => { clearShiftToday(); toast('Today\'s shift cleared'); });
 
   // Stop shift: log the hours worked so far (elapsed minus breaks) into today's Daily Log entry and end the shift.
   // A second shift on the same day adds to that day's entry, like adding hours by hand.
@@ -3568,7 +3573,7 @@
     const elapsedMin = Math.max(0, (Date.now() - state.clockInDate.getTime()) / 60000);
     const workedSec = Math.floor(Math.max(0, elapsedMin - Math.min(state.totalBreakMin, elapsedMin)) * 60);
     if (workedSec < 60) {
-      if (confirm('Less than a minute has been worked, so there is nothing to log. Discard this shift?')) clearShiftToday();
+      if (confirm('Less than a minute has been worked, so there is nothing to log. Discard this shift?')) { clearShiftToday(); toast('Shift discarded'); }
       return;
     }
     const date = shiftDayISO();
@@ -3591,6 +3596,7 @@
     renderLogList();
     calculateLog();
     saveLogEntries();
+    toast(`⏹️ Shift stopped. Logged ${Math.floor(workedSec / 3600)}h ${Math.floor((workedSec % 3600) / 60)}m to ${dmy(date)}`);
   });
 
   // Start a new shift: wipe the ended one and clock in right now
@@ -4226,6 +4232,7 @@
     saveLogEntries();
     renderLogList();
     calculateLog();
+    toast('🗑️ Entry removed');
   });
 
   function renderLogList() {
@@ -4406,6 +4413,7 @@
     const parsed = parseDurationText(logDuration.value);
     const target = parseInt(logTarget.value, 10) || 0;
     const date = logDateInput.value || null;
+    let toastMsg = '';
 
     if (!parsed) {
       flashInvalid(logDuration);
@@ -4423,6 +4431,7 @@
         entry.hh = parsed.hh; entry.mm = parsed.mm; entry.ss = parsed.ss; entry.target = target; entry.date = date;
       }
       cancelEditLogEntry();
+      toastMsg = `✏️ Entry for ${dmy(date)} updated`;
     } else {
       const existing = logEntries.find(e => e.date === date);
 
@@ -4433,9 +4442,11 @@
         existing.ss = totalSeconds % 60;
         existing.target = target;
         flashSuccess(logDuration);
+        toastMsg = `➕ Added to ${dmy(date)}`;
       } else {
         logEntryCount++;
         logEntries.push({ id: logEntryCount, hh: parsed.hh, mm: parsed.mm, ss: parsed.ss, target, date });
+        toastMsg = `✅ Day ${dmy(date)} added`;
       }
 
       logDuration.value = '';
@@ -4451,6 +4462,7 @@
     renderLogList();
     calculateLog();
     saveLogEntries();
+    toast(toastMsg);
   });
 
   syncLogBtn.addEventListener('click', () => {
@@ -4460,6 +4472,7 @@
     setLateOpen(true);
     el.lateMinutes.value = Math.max(1, Math.round(backlogMin));
     calculate();
+    toast('⏰ Running late balance added to Shift Details');
   });
 
   syncEarlyLogBtn.addEventListener('click', () => {
@@ -5062,6 +5075,7 @@
 
     const showCopied = () => {
       logCopyBtn.textContent = '✅ Copied';
+      toast('📄 Log copied to the clipboard');
       logCopyBtn.classList.add('copied');
       setTimeout(() => {
         logCopyBtn.textContent = '📄 Copy Log';
@@ -5195,6 +5209,7 @@
       resetBulkImport();
       logBulkFeedback.className = 'log-paste-feedback success';
       logBulkFeedback.textContent = `✅ Imported ${imported} day${imported === 1 ? '' : 's'}.${todayDone}`;
+      toast(`📥 Imported ${imported} day${imported === 1 ? '' : 's'}`);
     } else {
       logBulkFeedback.className = 'log-paste-feedback error';
       logBulkFeedback.textContent = '⚠️ No valid entries found. Use format: 8h 1m 36s, 8, 15-10-2026 (the date is required, up to 24h per day).';
@@ -5502,6 +5517,7 @@
     input.value = '';
     renderHolidayModal();
     renderMyMonth();
+    toast(type === 'holiday' ? '🎉 Holiday added' : '🤒 Absence added');
   }
 
   // ❌ on each Past Months row deletes that month's data
@@ -5523,6 +5539,7 @@
     renderLogList();
     calculateLog();
     renderMyMonth();
+    toast('🗑️ Month deleted');
   });
 
   targetHoursInput.addEventListener('input', renderMyMonth);
@@ -5561,6 +5578,7 @@
     saveAbsent();
     renderHolidayModal();
     renderMyMonth();
+    toast('Day removed');
   });
 
   document.getElementById('holidayClearBtn').addEventListener('click', () => {
@@ -5571,6 +5589,7 @@
     saveAbsent();
     renderHolidayModal();
     renderMyMonth();
+    toast('🗑️ Month cleared of holidays and absences');
   });
 
   // ========================================================================
@@ -5589,6 +5608,7 @@
     setUserName(meNameInput.value);
     meNameInput.value = userName;
     meNameSave.textContent = 'Saved ✓';
+    toast(userName ? '👤 Name saved' : 'Name cleared');
     setTimeout(() => { meNameSave.textContent = 'Save'; }, 1400);
   }
 
@@ -5613,6 +5633,7 @@
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
     backupMessage('✅ Backup downloaded.');
+    toast('⬇️ Backup downloaded');
   });
 
   document.getElementById('backupRestoreBtn').addEventListener('click', () => backupFileInput.click());
@@ -5642,6 +5663,7 @@
         keys.forEach(k => localStorage.setItem(k, data[k]));
       } catch (e) { resettingData = false; backupMessage('Couldn\'t write to storage, nothing was restored.', true); return; }
       backupMessage('Restoring…');
+      try { sessionStorage.setItem('clk_toast', '⬆️ Backup restored'); } catch (e) { /* storage unavailable */ }
       location.reload();
     };
     reader.readAsText(file);
@@ -5663,7 +5685,7 @@
     t.textContent = text;
     t.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.remove('show'), 4200);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
   }
 
   function cloudMsg(text, bad) {
@@ -5698,6 +5720,8 @@
     }
   });
 
+  function dmy(iso) { return iso ? iso.split('-').reverse().join('-') : ''; }
+
   function refreshCloudUI() {
     const st = cloud.state();
     const dirty = st.dirty;
@@ -5731,6 +5755,12 @@
   });
 
   setInterval(refreshCloudUI, 5000);
+
+  // Actions that reload the page (restore, flush) leave their message for the next load
+  try {
+    const later = sessionStorage.getItem('clk_toast');
+    if (later) { sessionStorage.removeItem('clk_toast'); setTimeout(() => toast(later), 500); }
+  } catch (e) { /* storage unavailable */ }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshCloudUI(); });
   refreshCloudUI();
 
@@ -5818,6 +5848,7 @@
       // everything the app stores, except the light/dark and pointer-effects preferences
       Object.keys(localStorage).filter(k => k.startsWith('cmo') && k !== 'cmoTheme' && k !== 'cmoFx' && k !== 'cmoSound' && k !== 'cmoSoundStyle' && k !== 'cmoNotify' && k !== 'cmoCalView').forEach(k => localStorage.removeItem(k));
     } catch (e) { /* storage unavailable */ }
+    try { sessionStorage.setItem('clk_toast', '🚽 Everything flushed'); } catch (e) { /* storage unavailable */ }
     location.reload();
   });
 
