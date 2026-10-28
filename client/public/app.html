@@ -1895,7 +1895,17 @@
   }
 
   /* Settings tab: one plain card, sections stacked and separated by hairlines */
-  .wrap.wrap-settings { grid-template-columns: minmax(0, 1fr); max-width: 720px; }
+  .wrap.wrap-settings { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 1360px; }
+  .wrap-settings > .col { min-width: 0; }
+  @media (max-width: 1000px) {
+    .wrap.wrap-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto auto 1fr; grid-template-areas: "top top" "profile prefs" "data prefs"; max-width: 900px; }
+    .wrap-settings > .settings-top { grid-area: top; }
+    .set-col-profile { grid-area: profile; } .set-col-prefs { grid-area: prefs; } .set-col-data { grid-area: data; }
+  }
+  @media (max-width: 700px) {
+    .wrap.wrap-settings { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: none; max-width: 560px; }
+    .wrap-settings > .settings-top, .set-col-profile, .set-col-prefs, .set-col-data { grid-area: auto; }
+  }
   .wrap-settings .card { padding-bottom: 8px; }
   .settings-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
   .settings-head .card-title { margin-bottom: 0; }
@@ -2003,6 +2013,7 @@
     body.kb-open { padding-bottom: 16px; }
   }
 
+  /* ===== v3.0.0: accounts (Google or email) with cloud sync to the database; Settings is three responsive columns ===== */
   /* ===== v2.295: cloud sync ===== */
   .header-actions .cloud-btn { position: relative; }
   .cloud-btn .cloud-check { opacity: 0; transition: opacity 0.2s ease; }
@@ -2023,26 +2034,25 @@
   .cmo-toast.show { opacity: 1; transform: translate(-50%, 0); }
   @media (max-width: 780px) { .cmo-toast { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); } }
 
-  /* Settings: three section cards, each setting in its own tile */
-  .settings-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 2px 2px 14px; }
+  /* Settings: three columns like the home page, one card each, simple divided rows */
+  .settings-top { grid-column: 1 / -1; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 2px 2px 0; }
   .settings-h { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--deep); }
   .settings-lead { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
-  .wrap-settings .set-sec { padding: 18px; }
-  .wrap-settings .set-sec + .set-sec { margin-top: 14px; }
-  .set-sec-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-  .set-sec-head .card-title { margin: 0; }
-  .set-ico { flex: none; width: 40px; height: 40px; display: grid; place-items: center; font-size: 19px; background: var(--sky-light); border: 1px solid var(--line); border-radius: 12px; }
-  .set-sub { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
-  .wrap-settings .set-sec .settings-block { margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); transition: border-color 0.2s ease; }
-  .wrap-settings .set-sec .settings-block:hover { border-color: var(--sky); }
-  .wrap-settings .set-sec .settings-block + .settings-block { margin-top: 12px; }
-  .wrap-settings .set-sec .settings-block > label,
-  .wrap-settings .set-sec .tile-head > label { font-size: 13.5px; font-weight: 700; color: var(--deep); }
-  .wrap-settings .set-sec .settings-block > label { margin-bottom: 10px; }
-  .wrap-settings .set-sec .settings-reset { border-color: color-mix(in srgb, #C0392B 35%, var(--line)); }
-  .wrap-settings .set-sec .settings-reset:hover { border-color: #C0392B; }
-  .wrap-settings .set-sec .settings-reset .me-danger-btn { color: #C0392B; border-color: color-mix(in srgb, #C0392B 45%, var(--line)); }
-  @media (max-width: 520px) { .wrap-settings .set-sec { padding: 14px; } .wrap-settings .set-sec .settings-block { padding: 12px; } }
+  .wrap-settings .set-sec .card-title + .settings-block { padding-top: 2px; border-top: none; }
+  .wrap-settings .set-sec .settings-block:last-child { padding-bottom: 10px; }
+  .wrap-settings .settings-reset .me-danger-btn { color: #C0392B; border-color: color-mix(in srgb, #C0392B 45%, var(--line)); }
+
+  /* Settings controls adapt to the width of their card */
+  .wrap-settings .fx-cards { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+  .wrap-settings .sound-picker { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .wrap-settings .fx-card, .wrap-settings .sound-opt { min-width: 0; line-height: 1.2; overflow-wrap: anywhere; }
+  .wrap-settings .me-name-input { flex: 1 1 110px; }
+  .wrap-settings .me-save-btn { flex: none; padding: 0 18px; }
+  .wrap-settings .settings-row.wrap-row,
+  .wrap-settings .settings-backup .settings-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 8px; }
+  .wrap-settings .settings-row.wrap-row .me-link-btn,
+  .wrap-settings .settings-backup .settings-row .me-link-btn { justify-content: center; text-align: center; min-height: 40px; }
+  @media (max-width: 700px) { .wrap-settings .fx-cards { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); } }
 </style>
 </head>
 <body>
@@ -2051,7 +2061,7 @@
     <span class="brand-mark" id="brandMark" aria-hidden="true">🖥️</span>
     <span class="brand-text">
       <span class="app-header-title" id="brandTitle" role="link" tabindex="0" title="Go to Shift Details">Clock me Out</span>
-      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v2.295</span></span>
+      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.0.0</span></span>
     </span>
   </div>
   <div class="view-bar" id="viewBar" data-view="overview">
@@ -2405,8 +2415,9 @@
     <div><h2 class="settings-h">⚙️ Settings</h2><p class="settings-lead">Make Clock me Out yours.</p></div>
     <button class="settings-back" id="settingsBackBtn" type="button">‹ Back</button>
   </div>
-  <section class="card set-sec">
-    <header class="set-sec-head"><span class="set-ico" aria-hidden="true">👤</span><div><div class="card-title">Profile</div><p class="set-sub">Your name and account</p></div></header>
+  <div class="col set-col-profile">
+    <section class="card set-sec">
+      <div class="card-title"><span>👤 Profile</span></div>
 <div class="settings-block">
       <label for="meNameInput">👤 Your name</label>
       <div class="settings-row">
@@ -2425,9 +2436,11 @@
       </div>
       <p class="me-hint" id="cloudHint"></p>
     </div>
-  </section>
-  <section class="card set-sec">
-    <header class="set-sec-head"><span class="set-ico" aria-hidden="true">🎛️</span><div><div class="card-title">Preferences</div><p class="set-sub">How it sounds and feels</p></div></header>
+    </section>
+  </div>
+  <div class="col set-col-prefs">
+    <section class="card set-sec">
+      <div class="card-title"><span>🎛️ Preferences</span></div>
 <div class="settings-block">
       <div class="tile-head"><label>🔊 Sound</label><button class="fx-switch" id="soundSwitch" type="button" role="switch" aria-checked="true" aria-label="Sound effects"><i></i></button></div>
       <div class="fold" id="soundFold"><div class="fold-inner">
@@ -2460,9 +2473,11 @@
         <p class="me-hint">Mouse and trackpad only. Tap a card to switch that effect on or off. Hover a card for what it does.</p>
       </div></div>
     </div>
-  </section>
-  <section class="card set-sec">
-    <header class="set-sec-head"><span class="set-ico" aria-hidden="true">🗄️</span><div><div class="card-title">Your data</div><p class="set-sub">Backup and reset</p></div></header>
+    </section>
+  </div>
+  <div class="col set-col-data">
+    <section class="card set-sec">
+      <div class="card-title"><span>🗄️ Your data</span></div>
 <div class="settings-block settings-backup">
       <label>💾 Backup</label>
       <div class="settings-row">
@@ -2479,7 +2494,8 @@
       </div>
       <p class="me-hint">Because cloud sync follows this device, flushing also clears the copy saved to your account.</p>
     </div>
-  </section>
+    </section>
+  </div>
 </div>
 
 <div class="cmo-toast" id="cmoToast" role="status" aria-live="polite"></div>
