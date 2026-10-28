@@ -1,4 +1,4 @@
-[README.md](https://github.com/user-attachments/files/34062258/README.md)
+[README.md](https://github.com/user-attachments/files/34075347/README.md)
 # Clock me Out
 
 Work-hours and clock-out calculator. Sign in, and your shifts and daily log are saved to your account and follow you to every device.
@@ -32,10 +32,13 @@ On the new site: Settings → Backup → **Restore backup**, choose that file.
 
 ## Admin dashboard
 Open **https://clock-me-out.vercel.app/admin** and sign in with the admin email and password. These belong to the site owner and are separate from user accounts.
-- Overview: total users, new sign-ups, active users, Google vs email split, 14-day sign-up chart.
-- Users: search, view a summary, disable or enable, unlock, delete.
+- **Overview:** total users, new sign-ups, active users, Google vs email split, 14-day sign-up chart, and the top people running late and ahead.
+- **Attendance:** a month calendar showing how many people logged hours each day (and holidays and absences). Click a day to see who logged, how long, and whether they were ahead or short. Below are the full Running late and Ahead of target lists for the month.
+- **Users:** search, view a summary, disable or enable, unlock, delete.
+- **Mascot tips:** the mascot gives a short status message. Tap it for the next tip.
 - Admin sessions last 8 hours and end when the tab closes. 5 wrong passwords from one IP lock admin sign-in for 15 minutes.
-- Privacy: the dashboard shows summaries (days logged, last saved), never a person's actual entries.
+- "Running late" means a person's logged time for the month is below their targets; "ahead" means above.
+- Privacy: the admin can see daily hours and ahead/behind totals per person. The sign-up form tells new users this.
 - A disabled user is signed out and blocked on their next request.
 
 ## API
@@ -45,7 +48,7 @@ Open **https://clock-me-out.vercel.app/admin** and sign in with the admin email 
 | `POST /api/auth/login` | Sign in with email + password |
 | `POST /api/auth/google` | Verify the Google ID token, return a session token |
 | `GET /api/auth/me` | Current user |
-| `POST /api/admin/login`, `GET /api/admin/stats`, `GET/PATCH/DELETE /api/admin/users…` | Admin dashboard (admin token only) |
+| `POST /api/admin/login`, `GET /api/admin/stats`, `GET /api/admin/attendance`, `GET/PATCH/DELETE /api/admin/users…` | Admin dashboard (admin token only) |
 | `GET /api/state` | The user's saved data (`data` is `null` until first save) |
 | `PUT /api/state` | Replace the user's saved data |
 
