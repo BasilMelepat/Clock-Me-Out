@@ -2,92 +2,151 @@
 <html lang="en">
 <head>
 <script>
-/* ===== Cloud sync (added for the MERN version) =====
-   The original app is unchanged. Its six data keys in localStorage are mirrored to the API for the
-   signed-in Google account. Theme, pointer effects and sound stay per device. */
+/* ===== Cloud sync engine (added for the MERN version) =====
+   The app's six data keys are saved to the signed-in account in MongoDB through the API.
+   Changes upload a moment after they happen; coming back to the tab picks up changes from other devices.
+   If this device AND the cloud both changed, nothing is overwritten: the person chooses Upload or Restore in Settings.
+   The visible UI (header cloud button, Settings > Cloud sync) lives in the app script and talks to window.clkCloud. */
 (function () {
   var KEYS = ['cmoLogEntries', 'cmoLogEntryCount', 'cmoShiftState', 'cmoHolidays', 'cmoAbsent', 'cmoUserName'];
-  var LS = window.localStorage;
-  var SP = Storage.prototype;
+  var LS = window.localStorage, SP = Storage.prototype;
   var _get = SP.getItem, _set = SP.setItem, _rem = SP.removeItem, _clr = SP.clear;
   var token = null, api = null;
   try { token = _get.call(LS, 'clk_token'); api = _get.call(LS, 'clk_api'); } catch (e) {}
 
-  if (!token || !api) { // not signed in: save nothing, go to the sign-in page
+  if (!token || !api) { // not signed in: save nothing and go to the sign-in page
     SP.setItem = SP.removeItem = SP.clear = function () {};
     document.documentElement.style.visibility = 'hidden';
     location.replace('/');
     return;
   }
 
-  function norm(o) { var a = []; KEYS.forEach(function (k) { if (o && typeof o[k] === 'string') a.push([k, o[k]]); }); return JSON.stringify(a); }
+  // The shift state carries a savedAt timestamp that changes on every save; it must not count as a change.
+  function strip(k, v) {
+    if (k === 'cmoShiftState') { try { var o = JSON.parse(v); if (o && typeof o === 'object') { delete o.savedAt; return JSON.stringify(o); } } catch (e) {} }
+    return v;
+  }
+  function norm(o) { var a = []; KEYS.forEach(function (k) { if (o && typeof o[k] === 'string') a.push([k, strip(k, o[k])]); }); return JSON.stringify(a); }
   function snap() { var o = {}; KEYS.forEach(function (k) { var v = _get.call(LS, k); if (v !== null) o[k] = v; }); return o; }
-  function lastSynced() { try { return JSON.parse(_get.call(LS, 'clk_synced') || 'null'); } catch (e) { return null; } }
-  function markSynced(o) { try { _set.call(LS, 'clk_synced', JSON.stringify(o)); } catch (e) {} }
-  function dirty() { return norm(snap()) !== norm(lastSynced() || {}); }
+  function read(key) { try { return JSON.parse(_get.call(LS, key) || 'null'); } catch (e) { return null; } }
+  function write(key, val) { try { _set.call(LS, key, JSON.stringify(val)); } catch (e) {} }
+  function dirty() { return norm(snap()) !== norm(read('clk_synced') || {}); }
+  function setLast() { try { _set.call(LS, 'clk_last', String(Date.now())); } catch (e) {} }
   function headers() { return { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }; }
+  function emit(state, message, manual) {
+    try { window.dispatchEvent(new CustomEvent('clk-sync', { detail: { state: state, message: message || '', manual: !!manual } })); } catch (e) {}
+  }
 
   function leave(wipe) {
     try {
       _rem.call(LS, 'clk_token');
-      if (wipe) { ['clk_synced', 'clk_user', 'clk_uid'].concat(KEYS).forEach(function (k) { _rem.call(LS, k); }); }
+      if (wipe) ['clk_synced', 'clk_pending', 'clk_last', 'clk_user', 'clk_uid'].concat(KEYS).forEach(function (k) { _rem.call(LS, k); });
     } catch (e) {}
     location.replace('/');
   }
 
-  var timer = null;
-  function push(unloading) {
-    clearTimeout(timer); timer = null;
-    if (!dirty()) return Promise.resolve();
-    var s = snap(), body = JSON.stringify({ data: s });
-    return fetch(api + '/state', { method: 'PUT', headers: headers(), body: body, keepalive: !!unloading && body.length < 60000 })
-      .then(function (r) {
-        if ((r.status === 401 || r.status === 403)) { leave(false); return; }
-        if (r.ok) { markSynced(s); if (dirty() && !unloading) schedule(); }
-      })
-      .catch(function () {});
+  function request(method, body, keepalive) {
+    return fetch(api + '/state', { method: method, headers: headers(), body: body, keepalive: !!keepalive }).then(function (r) {
+      if (r.status === 401 || r.status === 403) { leave(false); throw new Error('Your session ended. Please sign in again.'); }
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok) throw new Error(j.error || ('Server error ' + r.status));
+        return j;
+      });
+    }, function () { throw new Error('Couldn\'t reach the server. Check your connection.'); });
   }
-  function schedule() { clearTimeout(timer); timer = setTimeout(function () { push(false); }, 1200); }
+
+  var busy = false, conflict = false, timer = null;
+
+  function schedule() {
+    clearTimeout(timer);
+    if (!dirty()) return; // e.g. only the savedAt timestamp changed
+    timer = setTimeout(function () { sync({}); }, 1200);
+  }
+
+  function finish(state, message, o) {
+    busy = false;
+    if (state === 'ok') { conflict = false; setLast(); }
+    emit(state, message, o.manual);
+    if (state === 'ok' && dirty()) schedule(); // something changed while syncing
+  }
+
+  // o.force: 'up' (this device wins) or 'down' (the cloud wins); otherwise a three-way choice against the last synced copy
+  function sync(o) {
+    o = o || {};
+    if (busy) return Promise.resolve();
+    if (conflict && !o.manual) return Promise.resolve(); // paused until the person chooses
+    busy = true;
+    emit('syncing', '', o.manual);
+    return request('GET').then(function (j) {
+      var srv = j.data, local = snap(), base = read('clk_synced') || {}, pend = read('clk_pending');
+      var localN = norm(local), baseN = norm(base), srvN = srv ? norm(srv) : null;
+
+      function up() {
+        write('clk_pending', local);
+        return request('PUT', JSON.stringify({ data: local })).then(function () {
+          write('clk_synced', local); write('clk_pending', null);
+          finish('ok', 'Synced to the cloud ✓', o);
+        });
+      }
+      function down() {
+        try { if (window.clkBeforeApply) window.clkBeforeApply(); } catch (e) {}
+        KEYS.forEach(function (k) { if (typeof srv[k] === 'string') _set.call(LS, k, srv[k]); else _rem.call(LS, k); });
+        write('clk_synced', srv); write('clk_pending', null);
+        finish('ok', 'Restored from the cloud ✓', o);
+        setTimeout(function () { location.reload(); }, 350);
+      }
+
+      if (o.force === 'up') return up();
+      if (o.force === 'down') {
+        if (!srv) throw new Error('There is nothing in the cloud to restore yet.');
+        return down();
+      }
+      if (!srv) { // nothing saved in the cloud yet
+        if (Object.keys(local).length) return up();
+        write('clk_synced', {});
+        return finish('ok', 'Already up to date ✓', o);
+      }
+      if (srvN === localN) { write('clk_synced', srv); return finish('ok', 'Already up to date ✓', o); }
+      var thisDeviceChanged = localN !== baseN;
+      var cloudIsOurs = srvN === baseN || (pend && srvN === norm(pend)); // the cloud still holds what we last synced
+      if (!thisDeviceChanged) return down(); // only the cloud changed
+      if (cloudIsOurs) return up();          // only this device changed
+      conflict = true; busy = false;         // both changed: don't overwrite anything
+      emit('conflict', '', o.manual);
+    }).catch(function (e) {
+      busy = false;
+      emit('err', e.message, o.manual);
+    });
+  }
+
+  // Last-chance save when the page is hidden or closed.
+  function flush() {
+    clearTimeout(timer); timer = null;
+    if (conflict || !dirty()) return;
+    var s = snap(), body = JSON.stringify({ data: s });
+    write('clk_pending', s);
+    try { fetch(api + '/state', { method: 'PUT', headers: headers(), body: body, keepalive: body.length < 60000 }).catch(function () {}); } catch (e) {}
+  }
 
   SP.setItem = function (k) { _set.apply(this, arguments); if (this === LS && KEYS.indexOf(String(k)) > -1) schedule(); };
   SP.removeItem = function (k) { _rem.apply(this, arguments); if (this === LS && KEYS.indexOf(String(k)) > -1) schedule(); };
   SP.clear = function () { _clr.apply(this, arguments); if (this === LS) schedule(); };
 
-  // Pick up changes made on another device when you come back to this tab.
-  var pulling = false;
-  function pull() {
-    if (pulling || document.visibilityState !== 'visible') return;
-    if (dirty()) { push(false); return; }
-    pulling = true;
-    fetch(api + '/state', { headers: headers() })
-      .then(function (r) { if ((r.status === 401 || r.status === 403)) { leave(false); return null; } return r.ok ? r.json() : null; })
-      .then(function (j) {
-        pulling = false;
-        if (!j) return;
-        var srv = j.data;
-        if (!srv) { if (Object.keys(snap()).length) { markSynced({}); push(false); } return; }
-        if (norm(srv) === norm(snap())) { markSynced(srv); return; }
-        KEYS.forEach(function (k) { if (typeof srv[k] === 'string') _set.call(LS, k, srv[k]); else _rem.call(LS, k); });
-        markSynced(srv);
-        location.reload();
-      })
-      .catch(function () { pulling = false; });
-  }
+  window.addEventListener('pagehide', flush);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') flush(); else sync({}); });
+  window.addEventListener('focus', function () { sync({}); });
+  setTimeout(function () { sync({}); }, 1500);
 
-  window.addEventListener('pagehide', function () { push(true); });
-  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') push(true); else pull(); });
-  window.addEventListener('focus', pull);
-  setTimeout(function () { if (dirty()) push(false); else pull(); }, 1500);
-
-  document.addEventListener('DOMContentLoaded', function () {
-    var btn = document.getElementById('signOutBtn'), hint = document.getElementById('accountHint'), u = null;
-    try { u = JSON.parse(_get.call(LS, 'clk_user') || 'null'); } catch (e) {}
-    if (hint && u && u.email) hint.textContent = 'Signed in as ' + u.email + '. Your data is saved to this account and follows you to every device.';
-    if (btn) btn.addEventListener('click', function () {
-      btn.disabled = true; btn.textContent = 'Signing out…';
-      push(false).then(function () { leave(true); });
-    });
-  });
+  var user = read('clk_user') || {};
+  window.clkCloud = {
+    email: user.email || '',
+    state: function () { return { dirty: dirty(), conflict: conflict, busy: busy, lastSyncAt: Number(_get.call(LS, 'clk_last')) || 0 }; },
+    sync: function (o) { return sync(o || { manual: true }); },
+    signOut: function () {
+      var go = function () { leave(true); };
+      if (dirty() && !conflict) sync({ manual: true }).then(go, go); else go();
+    }
+  };
 })();
 </script>
 
@@ -1920,6 +1979,70 @@
     .cal-list .log-list-header, .cal-list .log-row { grid-template-columns: 22px minmax(0, 1fr) 62px 60px; gap: 4px; }
     .cal-state { font-size: 12px; } .cal-st { font-size: 11.5px; }
   }
+
+  /* ===== v2.294: phones get a bottom navigation bar; wider screens keep the top tabs ===== */
+  .view-tab .tab-ico { display: none; }
+  @media (max-width: 780px) {
+    /* the header's blur moves to a pseudo-element: a backdrop-filter on the header itself would trap the fixed bottom bar inside it */
+    .app-header { backdrop-filter: none; -webkit-backdrop-filter: none; padding: 10px 12px; margin-bottom: 12px; }
+    .app-header::before { content: ''; position: absolute; inset: 0; z-index: -1; backdrop-filter: blur(14px) saturate(160%); -webkit-backdrop-filter: blur(14px) saturate(160%); }
+    body { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+    .view-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; box-sizing: border-box; width: 100%; margin: 0; padding: 0 0 env(safe-area-inset-bottom, 0px);
+      background: rgba(255, 255, 255, 0.92); border-top: 1px solid var(--line); backdrop-filter: blur(14px) saturate(160%); -webkit-backdrop-filter: blur(14px) saturate(160%); }
+    body.dark-mode .view-bar { background: rgba(11, 22, 34, 0.92); }
+    .view-tabs { display: grid; width: 100%; box-shadow: none; }
+    .view-tabs::after { top: 0; bottom: auto; height: 3px; border-radius: 0 0 3px 3px;
+      background: linear-gradient(to right, transparent 28%, var(--sky) 28%, var(--sky) 72%, transparent 72%); }
+    .view-tab { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; padding: 10px 4px 8px; font-size: 11px; font-weight: 700; color: var(--muted); -webkit-tap-highlight-color: transparent; }
+    .view-tab .tab-emoji { display: none; }
+    .view-tab .tab-ico { display: block; line-height: 0; }
+    .view-tab .tab-ico svg { width: 22px; height: 22px; }
+    .view-tab.active { color: var(--sky); }
+    /* hide the bar while a field is being typed in, so it never sits on top of the keyboard */
+    body.kb-open .view-bar { display: none; }
+    body.kb-open { padding-bottom: 16px; }
+  }
+
+  /* ===== v2.295: cloud sync ===== */
+  .header-actions .cloud-btn { position: relative; }
+  .cloud-btn .cloud-check { opacity: 0; transition: opacity 0.2s ease; }
+  .cloud-btn.off svg { opacity: 0.65; }
+  .header-actions .cloud-btn.ok { color: var(--good); }
+  .header-actions .cloud-btn.ok .cloud-check { opacity: 1; }
+  .header-actions .cloud-btn.err { color: #C0392B; }
+  body.dark-mode .header-actions .cloud-btn.err { color: #FF8A80; }
+  .cloud-btn.syncing svg { animation: cloudPulse 0.9s ease-in-out infinite; }
+  .cloud-btn.dirty::after, .cloud-btn.err::after { content: ''; position: absolute; top: 5px; right: 5px; width: 9px; height: 9px; border-radius: 50%; background: #F0A53A; border: 2px solid var(--card); box-sizing: border-box; }
+  .cloud-btn.err::after { background: #E0453C; }
+  @keyframes cloudPulse { 50% { opacity: 0.3; } }
+  @media (prefers-reduced-motion: reduce) { .cloud-btn.syncing svg { animation: none; opacity: 0.5; } }
+  .wrap-settings .settings-row.wrap-row { flex-wrap: wrap; }
+  #cloudHint a { color: var(--sky); font-weight: 700; }
+  .cmo-toast { position: fixed; left: 50%; bottom: 24px; z-index: 2000; max-width: min(92vw, 440px); padding: 10px 16px; border-radius: 12px; background: var(--deep); color: var(--card);
+    font-size: 13px; font-weight: 600; line-height: 1.4; text-align: center; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25); opacity: 0; transform: translate(-50%, 14px); pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
+  .cmo-toast.show { opacity: 1; transform: translate(-50%, 0); }
+  @media (max-width: 780px) { .cmo-toast { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); } }
+
+  /* Settings: three section cards, each setting in its own tile */
+  .settings-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 2px 2px 14px; }
+  .settings-h { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--deep); }
+  .settings-lead { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+  .wrap-settings .set-sec { padding: 18px; }
+  .wrap-settings .set-sec + .set-sec { margin-top: 14px; }
+  .set-sec-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .set-sec-head .card-title { margin: 0; }
+  .set-ico { flex: none; width: 40px; height: 40px; display: grid; place-items: center; font-size: 19px; background: var(--sky-light); border: 1px solid var(--line); border-radius: 12px; }
+  .set-sub { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+  .wrap-settings .set-sec .settings-block { margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); transition: border-color 0.2s ease; }
+  .wrap-settings .set-sec .settings-block:hover { border-color: var(--sky); }
+  .wrap-settings .set-sec .settings-block + .settings-block { margin-top: 12px; }
+  .wrap-settings .set-sec .settings-block > label,
+  .wrap-settings .set-sec .tile-head > label { font-size: 13.5px; font-weight: 700; color: var(--deep); }
+  .wrap-settings .set-sec .settings-block > label { margin-bottom: 10px; }
+  .wrap-settings .set-sec .settings-reset { border-color: color-mix(in srgb, #C0392B 35%, var(--line)); }
+  .wrap-settings .set-sec .settings-reset:hover { border-color: #C0392B; }
+  .wrap-settings .set-sec .settings-reset .me-danger-btn { color: #C0392B; border-color: color-mix(in srgb, #C0392B 45%, var(--line)); }
+  @media (max-width: 520px) { .wrap-settings .set-sec { padding: 14px; } .wrap-settings .set-sec .settings-block { padding: 12px; } }
 </style>
 </head>
 <body>
@@ -1928,17 +2051,18 @@
     <span class="brand-mark" id="brandMark" aria-hidden="true">🖥️</span>
     <span class="brand-text">
       <span class="app-header-title" id="brandTitle" role="link" tabindex="0" title="Go to Shift Details">Clock me Out</span>
-      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v2.293</span><span class="user-chip" id="userChip" hidden></span></span>
+      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v2.295</span></span>
     </span>
   </div>
   <div class="view-bar" id="viewBar" data-view="overview">
     <div class="view-tabs" role="tablist" aria-label="Views">
-      <button class="view-tab active" id="tabOverview" type="button" role="tab" aria-selected="true"><span class="tab-emoji">💼 </span>Shift Details</button>
-      <button class="view-tab" id="tabLog" type="button" role="tab" aria-selected="false"><span class="tab-emoji">📅 </span>Daily Log</button>
-      <button class="view-tab" id="tabMe" type="button" role="tab" aria-selected="false"><span class="tab-emoji">📊 </span>Overview</button>
+      <button class="view-tab active" id="tabOverview" type="button" role="tab" aria-selected="true"><span class="tab-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span><span class="tab-emoji">💼 </span>Shift Details</button>
+      <button class="view-tab" id="tabLog" type="button" role="tab" aria-selected="false"><span class="tab-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/></svg></span><span class="tab-emoji">📅 </span>Daily Log</button>
+      <button class="view-tab" id="tabMe" type="button" role="tab" aria-selected="false"><span class="tab-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M8 17v-5M13 17V8M18 17v-9"/></svg></span><span class="tab-emoji">📊 </span>Overview</button>
     </div>
   </div>
   <div class="header-actions">
+    <button id="cloudBtn" class="theme-toggle-btn header-icon-btn cloud-btn off" type="button" aria-label="Cloud sync" title="Cloud sync: set it up in Settings"><svg class="icon-cloud" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><path class="cloud-check" d="M9.6 13.4l2.1 2.1 3.7-4"/></svg></button>
     <button id="settingsBtn" class="theme-toggle-btn header-icon-btn" type="button" aria-label="Settings" title="Settings" aria-pressed="false"><svg class="icon-gear" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
     <button id="themeToggleBtn" class="theme-toggle-btn header-icon-btn" type="button" aria-label="Light is on. Switch to dark theme" title="Light is on. Click to switch it off" aria-pressed="true"><svg class="icon-bulb" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="rays" d="M2 8h1.5M20.5 8H22M4.6 2.6l1 1M19.4 2.6l-1 1"/><path class="glass" d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path class="base" d="M9 18h6M10 22h4"/></svg></button>
   </div>
@@ -2277,9 +2401,13 @@
 </div>
 
 <div class="wrap wrap-settings" id="viewSettings" hidden>
-  <div class="card">
-    <div class="settings-head"><div class="card-title"><span>⚙️ Settings</span></div><button class="settings-back" id="settingsBackBtn" type="button">‹ Back</button></div>
-    <div class="settings-block">
+  <div class="settings-top">
+    <div><h2 class="settings-h">⚙️ Settings</h2><p class="settings-lead">Make Clock me Out yours.</p></div>
+    <button class="settings-back" id="settingsBackBtn" type="button">‹ Back</button>
+  </div>
+  <section class="card set-sec">
+    <header class="set-sec-head"><span class="set-ico" aria-hidden="true">👤</span><div><div class="card-title">Profile</div><p class="set-sub">Your name and account</p></div></header>
+<div class="settings-block">
       <label for="meNameInput">👤 Your name</label>
       <div class="settings-row">
         <input type="text" id="meNameInput" class="me-name-input" maxlength="40" placeholder="Your name" autocomplete="off">
@@ -2287,6 +2415,19 @@
       </div>
       <p class="me-hint" id="meNameHint">Tip: upload your attendance sheet in Bulk Import and your name is picked up automatically.</p>
     </div>
+<div class="settings-block" id="cloudSync">
+      <label>☁️ Cloud sync</label>
+      <div class="settings-row wrap-row">
+        <button class="me-link-btn" id="cloudSyncBtn" type="button">🔄 Sync now</button>
+        <button class="me-link-btn" id="cloudUpBtn" type="button">⬆️ Upload</button>
+        <button class="me-link-btn" id="cloudDownBtn" type="button">⬇️ Restore</button>
+        <button class="me-link-btn" id="signOutBtn" type="button">🚪 Sign out</button>
+      </div>
+      <p class="me-hint" id="cloudHint"></p>
+    </div>
+  </section>
+  <section class="card set-sec">
+    <header class="set-sec-head"><span class="set-ico" aria-hidden="true">🎛️</span><div><div class="card-title">Preferences</div><p class="set-sub">How it sounds and feels</p></div></header>
 <div class="settings-block">
       <div class="tile-head"><label>🔊 Sound</label><button class="fx-switch" id="soundSwitch" type="button" role="switch" aria-checked="true" aria-label="Sound effects"><i></i></button></div>
       <div class="fold" id="soundFold"><div class="fold-inner">
@@ -2319,6 +2460,9 @@
         <p class="me-hint">Mouse and trackpad only. Tap a card to switch that effect on or off. Hover a card for what it does.</p>
       </div></div>
     </div>
+  </section>
+  <section class="card set-sec">
+    <header class="set-sec-head"><span class="set-ico" aria-hidden="true">🗄️</span><div><div class="card-title">Your data</div><p class="set-sub">Backup and reset</p></div></header>
 <div class="settings-block settings-backup">
       <label>💾 Backup</label>
       <div class="settings-row">
@@ -2328,22 +2472,17 @@
       </div>
       <p class="me-hint" id="backupHint">Saves your logs, shift, holidays, absences and name to a file. Restoring replaces everything currently saved.</p>
     </div>
-<div class="settings-block" id="accountBlock">
-      <label>🔐 Account</label>
-      <div class="settings-row">
-        <button class="me-link-btn" id="signOutBtn" type="button">🚪 Sign out</button>
-      </div>
-      <p class="me-hint" id="accountHint">Your data is saved to your Google account.</p>
-    </div>
-<div class="settings-block">
+<div class="settings-block settings-reset">
       <label>🧹 Reset</label>
       <div class="settings-row">
         <button class="me-danger-btn" id="meResetBtn" type="button">🚽 Flush Everything</button>
       </div>
+      <p class="me-hint">Because cloud sync follows this device, flushing also clears the copy saved to your account.</p>
     </div>
-  </div>
+  </section>
 </div>
 
+<div class="cmo-toast" id="cmoToast" role="status" aria-live="polite"></div>
 <div class="app-footer footer-stacked">© 2026 Basil Melepat · Designed for You</div>
 
 <div class="modal-overlay" id="resetOverlay" style="display:none;">
@@ -5137,9 +5276,6 @@
   function setUserName(name, persist) {
     userName = String(name || '').trim().slice(0, 40);
     if (persist !== false) { try { localStorage.setItem('cmoUserName', userName); } catch (e) { /* storage unavailable */ } }
-    const chip = document.getElementById('userChip');
-    chip.textContent = userName;
-    chip.hidden = !userName;
     renderWelcomeGreeting();
     renderMyMonth();
   }
@@ -5495,8 +5631,96 @@
     reader.readAsText(file);
   });
 
+  // ========================================================================
+  // Cloud sync: the same data a backup holds, saved to the signed-in account in our database.
+  // The sync engine is the script at the very top of the page head (window.clkCloud); this block is its UI.
+  // ========================================================================
+  const cloud = window.clkCloud;
+  const cloudBtn = document.getElementById('cloudBtn');
+  const cloudHint = document.getElementById('cloudHint');
+  let cloudNote = '', cloudNoteBad = false, cloudNoteTimer = 0, cloudFlash = '', cloudFlashTimer = 0, toastTimer = 0;
+  const fmtClock = ms => new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const CONFLICT_TEXT = 'Both this device and the cloud changed since the last sync. Choose Upload to keep this device\'s data, or Restore to take the cloud copy.';
+
+  function toast(text) {
+    const t = document.getElementById('cmoToast');
+    t.textContent = text;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 4200);
+  }
+
+  function cloudMsg(text, bad) {
+    cloudNote = text; cloudNoteBad = !!bad;
+    clearTimeout(cloudNoteTimer);
+    cloudNoteTimer = setTimeout(() => { cloudNote = ''; refreshCloudUI(); }, 8000);
+    refreshCloudUI();
+  }
+
+  function setCloudFlash(state, ms) {
+    cloudFlash = state;
+    clearTimeout(cloudFlashTimer);
+    if (ms) cloudFlashTimer = setTimeout(() => { cloudFlash = ''; refreshCloudUI(); }, ms);
+    refreshCloudUI();
+  }
+
+  // The sync engine calls this just before it writes restored data, so nothing re-saves over it before the reload
+  window.clkBeforeApply = () => { resettingData = true; };
+
+  window.addEventListener('clk-sync', e => {
+    const d = e.detail || {};
+    if (d.state === 'syncing') setCloudFlash('syncing');
+    else if (d.state === 'ok') { setCloudFlash('ok', 2600); if (d.manual) toast(d.message); }
+    else if (d.state === 'conflict') {
+      setCloudFlash('err', 6000);
+      toast('Cloud and this device both changed. Open Settings → Cloud sync and choose Upload or Restore.');
+      cloudMsg(CONFLICT_TEXT, true);
+    } else if (d.state === 'err') {
+      setCloudFlash('err', 6000);
+      if (d.manual) toast(d.message);
+      cloudMsg(d.message, true);
+    }
+  });
+
+  function refreshCloudUI() {
+    const st = cloud.state();
+    const dirty = st.dirty;
+    cloudBtn.classList.remove('off');
+    cloudBtn.classList.toggle('dirty', dirty && !cloudFlash && !st.conflict);
+    cloudBtn.classList.toggle('syncing', cloudFlash === 'syncing');
+    cloudBtn.classList.toggle('ok', cloudFlash === 'ok');
+    cloudBtn.classList.toggle('err', cloudFlash === 'err' || st.conflict);
+    const when = st.lastSyncAt ? `last synced ${fmtClock(st.lastSyncAt)}` : 'not synced yet';
+    const tip = st.conflict ? 'Cloud and this device both changed. Open Settings to choose' : dirty ? `Unsynced changes (${when}). Tap to sync` : `Saved to your account. Tap to sync (${when})`;
+    cloudBtn.title = tip;
+    cloudBtn.setAttribute('aria-label', tip);
+    if (cloudNote) { cloudHint.textContent = cloudNote; cloudHint.style.color = cloudNoteBad ? '#C0392B' : ''; return; }
+    cloudHint.style.color = st.conflict ? '#C0392B' : '';
+    cloudHint.textContent = st.conflict
+      ? CONFLICT_TEXT
+      : `Signed in${cloud.email ? ' as ' + cloud.email : ''}, ${when}. Changes are saved to your account automatically.${dirty ? ' This device has changes the cloud doesn\'t have yet.' : ''} Upload overwrites the cloud copy; Restore replaces this device\'s data with it.`;
+  }
+
+  cloudBtn.addEventListener('click', () => cloud.sync({ manual: true }));
+  document.getElementById('cloudSyncBtn').addEventListener('click', () => cloud.sync({ manual: true }));
+  document.getElementById('cloudUpBtn').addEventListener('click', () => {
+    if (confirm('Overwrite the cloud copy with this device\'s data?')) cloud.sync({ force: 'up', manual: true });
+  });
+  document.getElementById('cloudDownBtn').addEventListener('click', () => {
+    if (confirm('Replace everything on this device with the cloud copy?')) cloud.sync({ force: 'down', manual: true });
+  });
+  document.getElementById('signOutBtn').addEventListener('click', () => {
+    if (cloud.state().conflict && !confirm('This device and the cloud both have changes that were never merged. Signing out removes this device\'s copy. Sign out anyway?')) return;
+    cloud.signOut();
+  });
+
+  setInterval(refreshCloudUI, 5000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshCloudUI(); });
+  refreshCloudUI();
+
   // Settings is its own tab; the name field is refreshed each time the tab opens
   const syncSettingsView = () => {
+    refreshCloudUI();
     if (document.activeElement !== meNameInput) meNameInput.value = userName;
     document.getElementById('meNameHint').hidden = !!userName;
   };
@@ -5988,6 +6212,11 @@
     holidays = new Set(JSON.parse(localStorage.getItem('cmoHolidays') || '[]').filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)));
     absentDays = new Set(JSON.parse(localStorage.getItem('cmoAbsent') || '[]').filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)));
   } catch (e) { /* storage unavailable or corrupt: start with no holidays */ }
+
+  // Phones: the bottom bar steps aside while a text, number, date or time field is focused
+  const kbField = t => t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) && !/^(checkbox|radio|button|submit|file|range)$/.test(t.type || '');
+  document.addEventListener('focusin', e => { if (kbField(e.target)) document.body.classList.add('kb-open'); });
+  document.addEventListener('focusout', () => document.body.classList.remove('kb-open'));
 
   loadShiftStateFromStorage();
 
