@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { adminApi, adminToken } from "./adminApi.js";
+import Mascot from "./Mascot.jsx";
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" }) : "—");
 const fmtAgo = (d) => {
@@ -13,6 +14,12 @@ const fmtAgo = (d) => {
 };
 const fmtBytes = (n) => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`);
 const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+const pad2 = (n) => String(n).padStart(2, "0");
+const dur = (sec) => { const a = Math.abs(Math.round(sec)), h = Math.floor(a / 3600), m = Math.floor((a % 3600) / 60); return h ? `${h}h ${m}m` : `${m}m`; };
+const signed = (sec) => `${sec < 0 ? "−" : "+"}${dur(sec)}`;
+const localDay = (d = new Date()) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const shiftMonth = (key, n) => { const [y, m] = key.split("-").map(Number); const d = new Date(y, m - 1 + n, 1); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; };
+const monthName = (key) => { const [y, m] = key.split("-").map(Number); return new Date(y, m - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" }); };
 const dash = (v) => (v === null || v === undefined ? "—" : v);
 
 export default function Admin() {
@@ -85,6 +92,10 @@ function Dashboard({ onLogout }) {
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState("");
   const [me, setMe] = useState("");
+  const today = localDay();
+  const [month, setMonth] = useState(today.slice(0, 7));
+  const [att, setAtt] = useState(null);
+  const [day, setDay] = useState(today);
 
   const loadStats = useCallback(() => adminApi.get("/stats").then(setStats).catch((e) => setError(e.message)), []);
   const loadRecent = useCallback(() => adminApi.get("/users?page=1&limit=5").then((d) => setRecent(d.users)).catch(() => {}), []);
@@ -92,11 +103,14 @@ function Dashboard({ onLogout }) {
     () => adminApi.get(`/users?q=${encodeURIComponent(query)}&page=${page}&limit=15`).then(setList).catch((e) => setError(e.message)),
     [query, page]
   );
+  const loadAtt = useCallback(() => adminApi.get(`/attendance?month=${month}`).then(setAtt).catch((e) => setError(e.message)), [month]);
+  useEffect(() => { loadAtt(); }, [loadAtt]);
+  const goMonth = (n) => { const m = shiftMonth(month, n); setMonth(m); setDay(m === today.slice(0, 7) ? today : `${m}-01`); };
   useEffect(() => { adminApi.get("/me").then((d) => setMe(d.email)).catch(() => {}); }, []);
   useEffect(() => { loadStats(); loadRecent(); }, [loadStats, loadRecent]);
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
-  const refresh = () => { loadStats(); loadRecent(); loadUsers(); };
+  const refresh = () => { loadStats(); loadRecent(); loadUsers(); loadAtt(); };
   const run = async (fn) => {
     setError("");
     try { await fn(); refresh(); } catch (e) { setError(e.message); }
@@ -113,7 +127,11 @@ function Dashboard({ onLogout }) {
   const googlePct = s ? pct(s.google, s.total) : 0;
   const maxSignups = Math.max(1, ...(s?.signups || []).map((d) => d.n));
   const pages = Math.max(1, Math.ceil(list.total / list.limit));
-  const title = view === "overview" ? ["Overview", "How Clock me Out is doing"] : ["Users", `${list.total} account${list.total === 1 ? "" : "s"}`];
+  const title = view === "overview" ? ["Overview", "How Clock me Out is doing"]
+    : view === "attendance" ? ["Attendance", "Who is running late and who is ahead"]
+    : ["Users", `${list.total} account${list.total === 1 ? "" : "s"}`];
+  const tipList = tipsFor(s, att, monthName(month));
+  const mood = att?.totals.late ? "surprised" : att?.totals.ahead ? "delighted" : null;
 
   return (
     <div className="adm">
@@ -124,6 +142,7 @@ function Dashboard({ onLogout }) {
         </div>
         <nav className="adm-nav" aria-label="Admin sections">
           <button aria-current={view === "overview" ? "page" : undefined} onClick={() => setView("overview")}><span aria-hidden="true">📊</span>Overview</button>
+          <button aria-current={view === "attendance" ? "page" : undefined} onClick={() => setView("attendance")}><span aria-hidden="true">🗓️</span>Attendance{att?.totals.late ? <em className="count warn">{att.totals.late}</em> : null}</button>
           <button aria-current={view === "users" ? "page" : undefined} onClick={() => setView("users")}><span aria-hidden="true">👥</span>Users{s ? <em className="count">{s.total}</em> : null}</button>
         </nav>
         <div className="adm-side-foot">
@@ -139,6 +158,8 @@ function Dashboard({ onLogout }) {
         </header>
 
         {error && <p className="admin-error" role="alert">{error}</p>}
+
+        <Say mood={mood} tips={tipList} />
 
         {view === "overview" && (
           <>
@@ -177,6 +198,11 @@ function Dashboard({ onLogout }) {
               </div>
             </section>
 
+            <section className="adm-row2">
+              <Board kind="late" rows={att?.late} limit={5} month={month} onPick={setDetail} onMore={() => setView("attendance")} />
+              <Board kind="ahead" rows={att?.ahead} limit={5} month={month} onPick={setDetail} onMore={() => setView("attendance")} />
+            </section>
+
             <section className="card">
               <div className="card-title"><span>Latest sign-ups</span><button className="a-btn" onClick={() => setView("users")}>All users →</button></div>
               <ul className="feed">
@@ -193,6 +219,16 @@ function Dashboard({ onLogout }) {
                   </li>
                 ))}
               </ul>
+            </section>
+          </>
+        )}
+
+        {view === "attendance" && (
+          <>
+            <Attendance month={month} goMonth={goMonth} att={att} day={day} setDay={setDay} today={today} onPick={setDetail} />
+            <section className="adm-row2">
+              <Board kind="late" rows={att?.late} limit={10} month={month} onPick={setDetail} />
+              <Board kind="ahead" rows={att?.ahead} limit={10} month={month} onPick={setDetail} />
             </section>
           </>
         )}
@@ -299,5 +335,144 @@ function Detail({ id, onClose, onChanged, setError }) {
         )}
       </div>
     </div>
+  );
+}
+
+function tipsFor(s, att, label) {
+  const t = att?.totals, out = [];
+  const people = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  if (t) {
+    if (t.late) out.push(`${people(t.late, "person is", "people are")} running late in ${label}. Check the Running late list.`);
+    else if (t.people) out.push(`Nobody is running late in ${label}. 🎉`);
+    if (t.ahead) out.push(`${people(t.ahead, "person is", "people are")} ahead of target. Nice work!`);
+    out.push(t.people ? `${people(t.people, "person has", "people have")} logged hours in ${label}.` : `Nobody has logged hours in ${label} yet.`);
+  }
+  if (s) {
+    out.push(s.new7 ? `${people(s.new7, "new user", "new users")} joined this week.` : "No new sign-ups this week yet.");
+    if (s.disabled) out.push(`${people(s.disabled, "account is", "accounts are")} disabled.`);
+  }
+  out.push("Hi admin! Tap me for another tip. 👋");
+  return out;
+}
+
+function Say({ mood, tips }) {
+  const [i, setI] = useState(0);
+  return (
+    <div className="say" onClick={() => setI(i + 1)}>
+      <Mascot mood={mood} />
+      <div className="say-bubble" role="status"><p>{tips[i % tips.length]}</p><small>Tap me for another tip</small></div>
+    </div>
+  );
+}
+
+function Who({ u }) {
+  return (
+    <span className="a-user">
+      {u.picture ? <img src={u.picture} alt="" referrerPolicy="no-referrer" /> : <span className="a-avatar">{(u.name || u.email)[0].toUpperCase()}</span>}
+      <span><strong>{u.name || "—"}</strong><br /><span className="muted small">{u.email}</span></span>
+    </span>
+  );
+}
+
+function Board({ kind, rows, limit, month, onPick, onMore }) {
+  const late = kind === "late";
+  const list = (rows || []).slice(0, limit);
+  return (
+    <div className="card">
+      <div className="card-title">
+        <span>{late ? "⏰ Running late" : "🚀 Ahead of target"}</span>
+        {onMore ? <button className="a-btn" onClick={onMore}>Attendance →</button> : <span className="chip">{monthName(month)}</span>}
+      </div>
+      <ul className="feed">
+        {!rows && <li className="muted">Loading…</li>}
+        {rows && list.length === 0 && <li className="muted">{late ? "Nobody is behind target. 🎉" : "Nobody is ahead yet."}</li>}
+        {list.map((u) => (
+          <li key={u.id}>
+            <button className="feed-row" onClick={() => onPick(u.id)}>
+              <Who u={u} />
+              <span className="feed-meta"><span className="muted small">{u.days} day{u.days === 1 ? "" : "s"}</span><span className={`pill ${late ? "bad" : "ok"}`}>{signed(u.balanceSec)}</span></span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+const WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function Attendance({ month, goMonth, att, day, setDay, today, onPick }) {
+  const [info, setInfo] = useState(null);
+  useEffect(() => {
+    let live = true;
+    setInfo(null);
+    adminApi.get(`/attendance/day?date=${day}`).then((d) => live && setInfo(d)).catch(() => {});
+    return () => { live = false; };
+  }, [day]);
+
+  const [y, mo] = month.split("-").map(Number);
+  const lead = new Date(y, mo - 1, 1).getDay();
+  const cells = [...Array(lead).fill(null), ...Array.from({ length: new Date(y, mo, 0).getDate() }, (_, i) => i + 1)];
+
+  return (
+    <section className="att-grid">
+      <div className="card">
+        <div className="card-title">
+          <span>🗓️ Calendar</span>
+          <span className="mnav">
+            <button className="a-btn" onClick={() => goMonth(-1)} aria-label="Previous month">‹</button>
+            <strong>{monthName(month)}</strong>
+            <button className="a-btn" onClick={() => goMonth(1)} aria-label="Next month">›</button>
+          </span>
+        </div>
+        <div className="acal">
+          {WEEK.map((w) => <span className="acal-h" key={w}>{w}</span>)}
+          {cells.map((d, i) => {
+            if (!d) return <span key={`b${i}`} />;
+            const ds = `${month}-${pad2(d)}`, c = att?.days?.[ds];
+            const tone = c?.logged ? (c.short > c.onTarget ? "short" : "ok") : c?.holiday ? "holiday" : c?.absent ? "absent" : "none";
+            return (
+              <button key={ds} className={`acal-d ${tone}${ds === day ? " sel" : ""}${ds === today ? " today" : ""}`} onClick={() => setDay(ds)} aria-label={ds}>
+                <b>{d}</b>
+                {c?.logged ? <small>{c.logged} logged</small> : c?.holiday ? <small>Holiday</small> : c?.absent ? <small>{c.absent} absent</small> : null}
+                {c?.logged ? <span className="acal-bar"><i style={{ width: `${(c.onTarget / c.logged) * 100}%` }} /></span> : null}
+              </button>
+            );
+          })}
+        </div>
+        <ul className="legend"><li className="ok">Mostly on target</li><li className="short">Mostly short</li><li className="holiday">Holiday</li><li className="absent">Absent</li></ul>
+      </div>
+
+      <div className="card">
+        <div className="card-title"><span>{new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" })}</span></div>
+        {!info && <p className="muted">Loading…</p>}
+        {info && info.logged.length === 0 && info.off.length === 0 && <p className="muted">Nobody logged hours or marked this day off.</p>}
+        {info && info.logged.length > 0 && (
+          <ul className="feed">
+            {info.logged.map((u) => {
+              const diff = u.clockedSec - u.targetSec;
+              return (
+                <li key={u.id}>
+                  <button className="feed-row" onClick={() => onPick(u.id)}>
+                    <Who u={u} />
+                    <span className="feed-meta"><span className="muted small">{dur(u.clockedSec)}</span><span className={`pill ${diff < 0 ? "bad" : "ok"}`}>{diff === 0 ? "On target" : signed(diff)}</span></span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {info && info.off.length > 0 && (
+          <>
+            <div className="card-title" style={{ marginTop: 14 }}><span>Off this day</span></div>
+            <ul className="feed">
+              {info.off.map((u) => (
+                <li key={u.id}><button className="feed-row" onClick={() => onPick(u.id)}><Who u={u} /><span className={`pill ${u.type === "absent" ? "bad" : "info"}`}>{u.type === "absent" ? "Absent" : "Holiday"}</span></button></li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+    </section>
   );
 }
