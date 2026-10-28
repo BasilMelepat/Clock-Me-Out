@@ -203,6 +203,38 @@ body.dark-mode .pill.bad { color: #FF8A80; }
   .adm-row { grid-template-columns: 1fr; }
 }
 
+/* Admin: attendance calendar, late/ahead boards, mascot tips */
+.adm-nav .count.warn { background: rgba(192, 57, 43, 0.15); border-color: transparent; color: #C0392B; font-weight: 700; }
+body.dark-mode .adm-nav .count.warn { color: #FF8A80; }
+.adm-row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.say { display: flex; align-items: center; gap: 14px; cursor: pointer; }
+.say .mascot { --mascot-size: 78px; }
+.say-bubble { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 16px; box-shadow: 0 8px 30px rgba(11, 42, 74, 0.06); max-width: 560px; }
+.say-bubble::before { content: ""; position: absolute; left: -7px; top: 50%; width: 12px; height: 12px; margin-top: -6px; background: var(--card); border-left: 1px solid var(--line); border-bottom: 1px solid var(--line); transform: rotate(45deg); }
+.say-bubble p { margin: 0; font-weight: 600; color: var(--deep); }
+.say-bubble small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
+.att-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.mnav { display: inline-flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--deep); }
+.mnav .a-btn { min-height: 32px; padding: 4px 10px; }
+.acal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.acal-h { text-align: center; font-size: 11px; color: var(--muted); font-weight: 600; }
+.acal-d { aspect-ratio: 1 / 0.92; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 2px; padding: 6px; min-width: 0; border: 1px solid var(--line); border-radius: 11px; background: var(--card); color: var(--ink); font: inherit; cursor: pointer; text-align: left; }
+.acal-d b { font-size: 13px; }
+.acal-d small { font-size: 10px; line-height: 1.1; color: var(--muted); }
+.acal-d.ok { background: color-mix(in srgb, #1E8E5A 14%, var(--card)); border-color: color-mix(in srgb, #1E8E5A 45%, var(--line)); }
+.acal-d.short { background: color-mix(in srgb, #E08A00 16%, var(--card)); border-color: color-mix(in srgb, #E08A00 50%, var(--line)); }
+.acal-d.holiday { background: var(--sky-light); border-color: var(--sky); }
+.acal-d.absent { background: color-mix(in srgb, #C0392B 12%, var(--card)); border-color: color-mix(in srgb, #C0392B 40%, var(--line)); }
+.acal-d.today b { text-decoration: underline; text-underline-offset: 3px; }
+.acal-d.sel { outline: 2px solid var(--sky); outline-offset: 1px; }
+.acal-bar { display: block; width: 100%; height: 4px; border-radius: 99px; background: #E08A00; overflow: hidden; }
+.acal-bar i { display: block; height: 100%; background: #1E8E5A; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; list-style: none; padding: 0; margin: 12px 0 0; font-size: 12px; color: var(--muted); }
+.legend li::before { content: ""; display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; border: 1px solid var(--line); }
+.legend .ok::before { background: #1E8E5A; } .legend .short::before { background: #E08A00; } .legend .holiday::before { background: var(--sky); } .legend .absent::before { background: #C0392B; }
+.gate-note { margin: -6px 0 12px; text-align: left; }
+@media (max-width: 860px) { .att-grid, .adm-row2 { grid-template-columns: 1fr; } .say .mascot { --mascot-size: 64px; } }
+
 /* Mascot on the sign-in page (same CRT character as the app) */
 .mascot { --mascot-size: 112px; position: relative; display: block; flex: none; width: var(--mascot-size); height: var(--mascot-size); padding: 0; border: 0; background: transparent; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; appearance: none; }
 .mascot:focus-visible { outline: 2px solid var(--sky); outline-offset: 4px; border-radius: 16px; }
