@@ -15,7 +15,7 @@ async function request(path, { method = "GET", body } = {}) {
 
   let res;
   try {
-    res = await fetch(BASE + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    res = await fetch(BASE + path, { method, headers, cache: "no-store", body: body ? JSON.stringify(body) : undefined });
   } catch {
     const err = new Error("Can't reach the server. Check your connection.");
     err.network = true;
