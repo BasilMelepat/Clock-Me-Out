@@ -9,6 +9,7 @@ router.use(requireAuth);
 
 // data is null until the user has saved something at least once.
 router.get("/", wrap(async (req, res) => {
+  res.set("Cache-Control", "no-store"); // always read the live copy
   const doc = await AppState.findOne({ user: req.userId }).lean();
   res.json({ data: doc ? doc.data : null, version: doc ? doc.version : 0, updatedAt: doc?.updatedAt || null });
 }));
