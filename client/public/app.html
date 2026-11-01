@@ -38,6 +38,7 @@
   }
 
   function leave(wipe) {
+    leaving = true;
     try {
       _rem.call(LS, 'clk_token');
       if (wipe) ['clk_synced', 'clk_pending', 'clk_last', 'clk_user', 'clk_uid'].concat(KEYS).forEach(function (k) { _rem.call(LS, k); });
@@ -55,7 +56,7 @@
     }, function () { throw new Error('Couldn\'t reach the server. Check your connection.'); });
   }
 
-  var busy = false, conflict = false, timer = null;
+  var busy = false, conflict = false, timer = null, leaving = false;
 
   function schedule() {
     clearTimeout(timer);
@@ -135,7 +136,31 @@
   window.addEventListener('pagehide', flush);
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') flush(); else sync({}); });
   window.addEventListener('focus', function () { sync({}); });
-  setTimeout(function () { sync({}); }, 1500);
+
+  // Cloud first: the saved data is loaded from the account BEFORE the app starts, so it never opens on a stale device copy.
+  // (Edits on this device that haven't uploaded yet are kept; the sync below uploads them or flags a conflict.)
+  (function cloudFirst() {
+    var note = '', ctl = window.AbortController ? new AbortController() : null;
+    var cut = setTimeout(function () { if (ctl) ctl.abort(); }, 8000);
+    fetch(api + '/state', { headers: headers(), cache: 'no-store', signal: ctl ? ctl.signal : undefined }).then(function (r) {
+      if (r.status === 401 || r.status === 403) { leave(false); throw new Error('session'); }
+      if (!r.ok) throw new Error('Server error ' + r.status);
+      return r.json();
+    }).then(function (j) {
+      var srv = j.data;
+      if (srv && !dirty()) {
+        KEYS.forEach(function (k) { if (typeof srv[k] === 'string') _set.call(LS, k, srv[k]); else _rem.call(LS, k); });
+        write('clk_synced', srv); setLast();
+      }
+    }).catch(function (e) {
+      if (e.message !== 'session') note = 'Couldn\'t reach the cloud, so this is the last copy saved on this device.';
+    }).then(function () {
+      clearTimeout(cut);
+      window.clkLoadNote = note;
+      if (!leaving && window.clkStartApp) window.clkStartApp();
+      setTimeout(function () { sync({}); }, 1500);
+    });
+  })();
 
   var user = read('clk_user') || {};
   window.clkCloud = {
@@ -149,6 +174,34 @@
   };
 })();
 </script>
+<script>
+/* App loader: the main app script is held back (type text/cmo-deferred) until the cloud data has been put in place. */
+window.clkStartApp = function () {
+  var f = window.clkStartApp;
+  if (f.called) return;
+  f.called = true;
+  var go = function () {
+    var el = document.getElementById('cmoMain');
+    var run = document.createElement('script');
+    run.text = el.text;
+    el.parentNode.replaceChild(run, el);
+    var splash = document.getElementById('clkSplash');
+    if (splash) splash.remove();
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+};
+setTimeout(function () { window.clkStartApp(); }, 12000); // safety net: never leave the app stuck on the loading screen
+if (window.clkPreview) window.clkStartApp();
+</script>
+<style>
+#clkSplash { position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; background: linear-gradient(160deg, #EAF4FC 0%, #FFFFFF 55%); color: #0B2A4A; font-family: 'Inter', system-ui, sans-serif; }
+body.dark-mode #clkSplash { background: linear-gradient(160deg, #0B1622 0%, #060D16 55%); color: #E8F1FA; }
+.clk-splash-card { display: flex; align-items: center; gap: 12px; padding: 16px 22px; border-radius: 16px; background: #FFFFFF; border: 1px solid #D7E6F2; box-shadow: 0 8px 30px rgba(11, 42, 74, 0.08); font-weight: 700; }
+body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
+.clk-splash-card span { font-size: 22px; animation: clkPulse 1.2s ease-in-out infinite; }
+@keyframes clkPulse { 50% { transform: translateY(-3px); opacity: 0.7; } }
+@media (prefers-reduced-motion: reduce) { .clk-splash-card span { animation: none; } }
+</style>
 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -2013,6 +2066,7 @@
     body.kb-open { padding-bottom: 16px; }
   }
 
+  /* ===== v3.3.0: always load from the cloud first (loading screen, no stale device copy) ===== */
   /* ===== v3.2.0: toast messages for the main actions (shift, breaks, log, holidays, settings, backup) and in the admin dashboard ===== */
   /* ===== v3.1.0: admin Attendance (calendar, running late, ahead) and mascot tips; sign-up form notes what the admin can see ===== */
   /* ===== v3.0.0: accounts (Google or email) with cloud sync to the database; Settings is three responsive columns ===== */
@@ -2058,12 +2112,13 @@
 </style>
 </head>
 <body>
+<div id="clkSplash" role="status" aria-live="polite"><div class="clk-splash-card"><span aria-hidden="true">☁️</span><b>Loading your data from the cloud…</b></div></div>
 <header class="app-header">
   <div class="brand">
     <span class="brand-mark" id="brandMark" aria-hidden="true">🖥️</span>
     <span class="brand-text">
       <span class="app-header-title" id="brandTitle" role="link" tabindex="0" title="Go to Shift Details">Clock me Out</span>
-      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.2.0</span></span>
+      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.3.0</span></span>
     </span>
   </div>
   <div class="view-bar" id="viewBar" data-view="overview">
@@ -2550,7 +2605,7 @@
   </div>
 </div>
 
-<script>
+<script type="text/cmo-deferred" id="cmoMain">
   // Clock me Out: application script
   //
   // Layout (top to bottom): each section has its state / DOM references first, then its
@@ -5755,6 +5810,8 @@
   });
 
   setInterval(refreshCloudUI, 5000);
+
+  if (window.clkLoadNote) { setCloudFlash('err', 6000); setTimeout(() => toast(window.clkLoadNote), 600); }
 
   // Actions that reload the page (restore, flush) leave their message for the next load
   try {
