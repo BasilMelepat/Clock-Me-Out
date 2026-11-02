@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/34240319/README.md)
 # Clock me Out
 
 Work-hours and clock-out calculator. Sign in, and your shifts and daily log are saved to your account and follow you to every device.
@@ -7,7 +6,7 @@ React sign-in page · Express API · MongoDB.
 ```
 clock-me-out/
 ├── client/
-│   ├── public/app.html   the Clock me Out app (v3.3.0) with cloud sync and a "Sign out" row in Settings
+│   ├── public/app.html   the Clock me Out app (v3.6.0) with cloud sync and a "Sign out" row in Settings
 │   └── src/              sign-in page (Google or email) and the admin dashboard
 └── server/               Express API
 ```
@@ -25,8 +24,11 @@ Signing out is under **Settings → Cloud sync → Sign out**.
 3. A sync engine saves the app's six data keys (logs, shift, holidays, absences, name) to your account a moment after every change, and when you leave the page.
 4. The header **cloud button** and **Settings → Cloud sync** show the status: tap to sync now, **Upload** to overwrite the cloud copy with this device, **Restore** to replace this device with the cloud copy.
 5. Coming back to a tab picks up changes from other devices. If this device and the cloud both changed, nothing is overwritten and you choose Upload or Restore.
-6. Main actions (starting or stopping a shift, adding breaks, logging days, holidays, backup, name) show a short toast message. In the admin dashboard, disabling, enabling, unlocking and deleting do too.
-7. Theme, pointer effects and sound stay per device.
+6. In the Log tab the Table View can be sorted by Day, Clocked, Target or Log (tap a column title again to reverse). Hovering a day in the calendar highlights its table row, and hovering a row highlights its day in the calendar.
+7. **Clear Log** in the Table View removes every day shown for that month, after a warning popup. **Bulk Import** has two steps (upload a sheet, or paste entries) and its Import button stays disabled until there is something valid to import.
+8. Click a row in the Table View to edit that day. Deleting an entry, clearing the log, deleting a past month, or removing holidays and absences shows a toast with an **Undo** button (or press Ctrl/Cmd+Z) for a few seconds.
+9. Main actions (starting or stopping a shift, adding breaks, logging days, holidays, backup, name) show a short toast message. In the admin dashboard, disabling, enabling, unlocking and deleting do too.
+10. Theme, pointer effects and sound stay per device.
 
 ## Moving your existing data over
 On the old site: Settings → Backup → **Download backup**.
@@ -55,7 +57,7 @@ Open **https://clock-me-out.vercel.app/admin** and sign in with the admin email 
 | `PUT /api/state` | Replace the user's saved data |
 
 ## Versioning
-MAJOR.MINOR.PATCH, shown in the header badge (for example v3.3.0).
+MAJOR.MINOR.PATCH, shown in the header badge (for example v3.6.0).
 - **MAJOR:** a big redesign or a change that breaks saved data.
 - **MINOR:** a new feature.
 - **PATCH:** a fix or small tweak.
