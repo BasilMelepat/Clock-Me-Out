@@ -2066,6 +2066,50 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
     body.kb-open { padding-bottom: 16px; }
   }
 
+
+
+
+  /* ===== v3.6.0: click a table row to edit; toast with Undo ===== */
+  .log-row[data-id] { cursor: pointer; }
+  .log-row.is-editing { background: var(--sky-light); border-color: var(--sky); }
+  .log-row[data-id]:focus-visible { outline: 2px solid var(--sky); outline-offset: 2px; }
+  .cmo-toast.has-undo { display: flex; align-items: center; justify-content: center; gap: 12px; text-align: left; }
+  .cmo-toast.show.has-undo { pointer-events: auto; }
+  .cmo-toast-undo { flex: none; padding: 3px 12px; border: 1px solid currentColor; border-radius: 8px; background: transparent; color: inherit; font: inherit; font-weight: 800; cursor: pointer; }
+  .cmo-toast-undo:hover { background: rgba(255, 255, 255, 0.18); }
+  .cmo-toast-undo:focus-visible { outline: 2px solid var(--sky); outline-offset: 2px; }
+  /* ===== v3.5.0: Clear Log, redesigned Bulk Import ===== */
+  .log-clear-btn { color: #C0392B; border-color: color-mix(in srgb, #C0392B 40%, var(--line)); }
+  .log-clear-btn:hover { background: color-mix(in srgb, #C0392B 12%, var(--surface)); }
+  .bulk { display: grid; gap: 0; }
+  .bulk-step { background: var(--sky-light); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+  .bulk-step-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .bulk-num { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--sky); color: #fff; font-size: 12px; font-weight: 700; }
+  .bulk-step-head b { font-size: 13.5px; color: var(--deep); }
+  .bulk-step-head small { display: block; margin-top: 1px; font-size: 12px; color: var(--muted); }
+  .bulk-drop { min-height: 64px; border-style: dashed; }
+  .bulk-drop.drag { border-color: var(--sky); background: var(--surface); box-shadow: 0 0 0 4px rgba(79, 168, 232, 0.22); }
+  .bulk-or { display: flex; align-items: center; gap: 10px; margin: 10px 0; font-size: 12px; color: var(--muted); }
+  .bulk-or::before, .bulk-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .bulk-format { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 4px; font-size: 12px; color: var(--muted); }
+  .bulk-format code { padding: 2px 8px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); color: var(--deep); font-size: 12px; }
+  .bulk-count { margin: 10px 2px 0; font-size: 12.5px; color: var(--muted); }
+  .bulk-count.ready { color: var(--good); font-weight: 600; }
+  .modal-import-btn:disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+  /* ===== v3.4.0: sortable table header; calendar and table highlight each other on hover ===== */
+  .log-sort { display: inline-flex; align-items: center; gap: 2px; padding: 2px 0; margin: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; white-space: nowrap; border-radius: 6px; }
+  .log-sort:hover, .log-sort.on { color: var(--deep); }
+  .log-sort:focus-visible { outline: 2px solid var(--sky); outline-offset: 2px; }
+  .log-sort-ind { font-style: normal; font-size: 8px; color: var(--sky); min-width: 7px; }
+  #logListWrap .log-list-header, #logListWrap .log-row { grid-template-columns: 36px 1fr 72px 82px 44px; }
+  .log-row { transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s; }
+  .log-row.link-hl { background: var(--sky-light); border-color: var(--sky); box-shadow: 0 6px 16px rgba(79, 168, 232, 0.22); transform: translateX(2px); }
+  .calendar-cell.link-hl:not(.empty) { z-index: 2; border-radius: 50%; transform: translateY(-3px) scale(1.1); box-shadow: 0 10px 20px rgba(11, 42, 74, 0.16); background: var(--sky-light); }
+  @media (max-width: 780px) { #logListWrap .log-list-header, #logListWrap .log-row { grid-template-columns: 32px 1fr 44px 58px 40px; } }
+  @media (prefers-reduced-motion: reduce) { .log-row.link-hl, .calendar-cell.link-hl:not(.empty) { transform: none; } }
+  /* ===== v3.6.0: click a table row to edit it (no edit button); deleting or clearing shows a toast with Undo ===== */
+  /* ===== v3.5.0: Clear Log (with a warning popup) in the Table View; Bulk Import redesigned in two steps, and Import stays disabled until there is data ===== */
+  /* ===== v3.4.0: sort the Table View by any column; hovering a calendar day highlights its table row and the reverse ===== */
   /* ===== v3.3.0: always load from the cloud first (loading screen, no stale device copy) ===== */
   /* ===== v3.2.0: toast messages for the main actions (shift, breaks, log, holidays, settings, backup) and in the admin dashboard ===== */
   /* ===== v3.1.0: admin Attendance (calendar, running late, ahead) and mascot tips; sign-up form notes what the admin can see ===== */
@@ -2118,7 +2162,7 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
     <span class="brand-mark" id="brandMark" aria-hidden="true">🖥️</span>
     <span class="brand-text">
       <span class="app-header-title" id="brandTitle" role="link" tabindex="0" title="Go to Shift Details">Clock me Out</span>
-      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.3.0</span></span>
+      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.6.0</span></span>
     </span>
   </div>
   <div class="view-bar" id="viewBar" data-view="overview">
@@ -2337,14 +2381,23 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
         <button class="clear-btn x-btn" id="closeBulkBtn" type="button" style="display:none;" aria-label="Close bulk import" title="Close"><span class="x-icon">❌</span></button>
       </div>
       <button class="add-btn" id="openBulkBtn" type="button">➕ Add Bulk Import</button>
-      <div id="bulkImportBody" style="display:none;">
-        <button id="logBulkUploadBtn" class="modal-upload-btn" type="button">📎 Upload Attendance Excel(s) (.xlsx)</button>
-        <input type="file" id="logBulkFileInput" accept=".xlsx,.xls,.csv" multiple style="display:none;">
-        <select id="logBulkEmployeeSelect" class="modal-employee-select" style="display:none;"></select>
-        <textarea id="logBulkArea" class="modal-textarea" placeholder="0h 0m 0s, 8, dd-mm-yyyy&#10;0h 0m 0s, 8, dd-mm-yyyy&#10;0h 0m 0s, 8, dd-mm-yyyy"></textarea>
-        <div class="modal-hint">One entry per line: <b>Xh Ym Zs, Target, dd-mm-yyyy</b> (comma or tab separated). The date is required (lines without one are skipped); the target is optional and any part (h/m/s) can be omitted.</div>
+      <div id="bulkImportBody" class="bulk" style="display:none;">
+        <div class="bulk-step">
+          <div class="bulk-step-head"><span class="bulk-num">1</span><div><b>Upload an attendance sheet</b><small>Excel or CSV. Click, or drop files here. More than one file is fine.</small></div></div>
+          <button id="logBulkUploadBtn" class="modal-upload-btn bulk-drop" type="button">📎 Upload Attendance Excel(s) (.xlsx)</button>
+          <input type="file" id="logBulkFileInput" accept=".xlsx,.xls,.csv" multiple style="display:none;">
+          <select id="logBulkEmployeeSelect" class="modal-employee-select" style="display:none;"></select>
+        </div>
+        <div class="bulk-or"><span>or</span></div>
+        <div class="bulk-step">
+          <div class="bulk-step-head"><span class="bulk-num">2</span><div><b>Paste your entries</b><small>One day per line</small></div></div>
+          <textarea id="logBulkArea" class="modal-textarea" placeholder="0h 0m 0s, 8, dd-mm-yyyy&#10;0h 0m 0s, 8, dd-mm-yyyy&#10;0h 0m 0s, 8, dd-mm-yyyy"></textarea>
+          <div class="bulk-format"><span>Format</span><code>8h 30m 0s, 8, 15-10-2026</code></div>
+          <div class="modal-hint">Comma or tab separated: <b>Xh Ym Zs, Target, dd-mm-yyyy</b>. The date is required (lines without one are skipped). The target is optional, and any part (h/m/s) can be left out.</div>
+        </div>
+        <div class="bulk-count" id="bulkCount" aria-live="polite"></div>
         <div class="log-paste-feedback" id="logBulkFeedback"></div>
-        <button id="logBulkImportBtn" class="modal-import-btn" type="button">Import</button>
+        <button id="logBulkImportBtn" class="modal-import-btn" type="button" disabled>Import</button>
       </div>
     </div>
   </div>
@@ -2389,15 +2442,18 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
     <div class="card">
       <div class="card-title card-title-wrap">
         <span id="logTableTitle">📋 Table View</span>
-        <button class="log-copy-btn" id="logCopyBtn" type="button">📄 Copy Log</button>
+        <div class="card-title-actions">
+          <button class="log-copy-btn" id="logCopyBtn" type="button">📄 Copy Log</button>
+          <button class="log-copy-btn log-clear-btn" id="logClearBtn" type="button" style="display:none;">🗑️ Clear Log</button>
+        </div>
       </div>
       <div class="log-empty" id="logTableEmpty">No days logged yet.</div>
       <div id="logListWrap" style="display:none;">
-        <div class="log-list-header">
-          <span>Day</span>
-          <span>Clocked</span>
-          <span>Target</span>
-          <span>Log</span>
+        <div class="log-list-header" id="logSortHeader">
+          <button class="log-sort" type="button" data-sort="date" title="Sort by day">Day<i class="log-sort-ind"></i></button>
+          <button class="log-sort" type="button" data-sort="clocked" title="Sort by clocked time">Clocked<i class="log-sort-ind"></i></button>
+          <button class="log-sort" type="button" data-sort="target" title="Sort by target">Target<i class="log-sort-ind"></i></button>
+          <button class="log-sort" type="button" data-sort="diff" title="Sort by ahead / short">Log<i class="log-sort-ind"></i></button>
           <span></span>
         </div>
         <div id="logEntriesContainer"></div>
@@ -2577,6 +2633,27 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
     <div class="holiday-actions">
       <button class="log-io-btn" id="resetCancelBtn" type="button">Cancel</button>
       <button class="modal-import-btn reset-confirm-btn" id="resetConfirmBtn" type="button">🚽 Flush it</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="clearLogOverlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="clearLogTitle">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span id="clearLogTitle">⚠️ Clear the log?</span>
+      <button class="modal-close" id="clearLogCloseBtn" type="button" aria-label="Close">❌</button>
+    </div>
+    <div class="reset-body">
+      <p id="clearLogLead"></p>
+      <ul>
+        <li>Their hours, targets and dates</li>
+        <li>They disappear from the Table View, the calendar and your Overview totals</li>
+      </ul>
+      <p>Holidays, absences and your name are not touched. This can't be undone, so use <b>Copy Log</b> first, or download a backup in Settings, if you want to keep a copy.</p>
+    </div>
+    <div class="holiday-actions">
+      <button class="log-io-btn" id="clearLogCancelBtn" type="button">Cancel</button>
+      <button class="modal-import-btn reset-confirm-btn" id="clearLogConfirmBtn" type="button">🗑️ Clear log</button>
     </div>
   </div>
 </div>
@@ -4276,21 +4353,58 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
     return logEntries.filter(e => (e.date ? e.date.startsWith(monthPrefix(y, m)) : isCurrent));
   }
 
-  // Edit / delete buttons in the table: one delegated handler instead of two listeners per row on every render
+  // Table rows: click a row to edit that day, the ❌ deletes it. One delegated handler instead of listeners on every row.
   logEntriesContainer.addEventListener('click', e => {
-    const btn = e.target.closest('[data-edit], [data-remove]');
-    if (!btn) return;
-    if (btn.dataset.edit !== undefined) { startEditLogEntry(parseInt(btn.dataset.edit, 10)); return; }
-    const id = parseInt(btn.dataset.remove, 10);
-    logEntries = logEntries.filter(en => en.id !== id);
-    if (logEditingId === id) cancelEditLogEntry();
-    saveLogEntries();
-    renderLogList();
-    calculateLog();
-    toast('🗑️ Entry removed');
+    const del = e.target.closest('[data-remove]');
+    if (del) {
+      const id = parseInt(del.dataset.remove, 10);
+      const removed = logEntries.find(en => en.id === id);
+      logEntries = logEntries.filter(en => en.id !== id);
+      if (logEditingId === id) cancelEditLogEntry();
+      saveLogEntries();
+      renderLogList();
+      calculateLog();
+      toast('🗑️ Entry removed', () => { restoreLogEntries([removed]); toast('↩️ Entry restored'); });
+      return;
+    }
+    const row = e.target.closest('.log-row[data-id]');
+    if (row) startEditLogEntry(parseInt(row.dataset.id, 10));
   });
+  logEntriesContainer.addEventListener('keydown', e => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.log-row[data-id]')) {
+      e.preventDefault();
+      startEditLogEntry(parseInt(e.target.dataset.id, 10));
+    }
+  });
+  function markEditingRow() {
+    document.querySelectorAll('#logEntriesContainer .log-row').forEach(r => r.classList.toggle('is-editing', logEditingId !== null && Number(r.dataset.id) === logEditingId));
+  }
+
+  // The Clear Log button only shows when the table has days to clear
+  function updateClearLogBtn() {
+    const b = document.getElementById('logClearBtn');
+    if (b) b.style.display = entriesInTableMonth().length ? '' : 'none';
+  }
+
+  // Table sorting (remembered on this device)
+  var logSort;
+  function currentSort() {
+    if (!logSort) {
+      try { const v = JSON.parse(localStorage.getItem('cmoLogSort') || 'null'); if (v && ['date', 'clocked', 'target', 'diff'].includes(v.key)) logSort = { key: v.key, dir: v.dir < 0 ? -1 : 1 }; } catch (e) { /* ignore */ }
+      if (!logSort) logSort = { key: 'date', dir: 1 };
+    }
+    return logSort;
+  }
+  function logSeconds(e) { return e.hh * 3600 + e.mm * 60 + e.ss; }
+  function logDateCompare(a, b) {
+    if (a.date && b.date) return a.date.localeCompare(b.date);
+    if (a.date && !b.date) return -1;
+    if (!a.date && b.date) return 1;
+    return 0;
+  }
 
   function renderLogList() {
+    document.querySelectorAll('.link-hl').forEach(el => el.classList.remove('link-hl'));
     logEntriesContainer.innerHTML = '';
     const { y: viewYear, m: viewMonth } = tableMonth();
     const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -4301,11 +4415,24 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
     logListWrap.style.display = shown.length ? 'block' : 'none';
     document.getElementById('logTableEmpty').style.display = shown.length ? 'none' : 'block';
 
+    // A row keeps its day number (its place in date order) whatever the sort is
+    const dayNumber = new Map(shown.slice().sort(logDateCompare).map((e, i) => [e.id, i + 1]));
+    const sort = currentSort();
+    const sortValue = {
+      date: null,
+      clocked: e => logSeconds(e),
+      target: e => e.target,
+      diff: e => logSeconds(e) - e.target * 3600
+    };
     const sortedEntries = shown.slice().sort((a, b) => {
-      if (a.date && b.date) return a.date.localeCompare(b.date);
-      if (a.date && !b.date) return -1;
-      if (!a.date && b.date) return 1;
-      return 0;
+      const by = sortValue[sort.key] ? sort.dir * (sortValue[sort.key](a) - sortValue[sort.key](b)) : sort.dir * logDateCompare(a, b);
+      return by || logDateCompare(a, b);
+    });
+    updateClearLogBtn();
+    document.querySelectorAll('#logSortHeader [data-sort]').forEach(btn => {
+      const on = btn.dataset.sort === sort.key;
+      btn.classList.toggle('on', on);
+      btn.querySelector('.log-sort-ind').textContent = on ? (sort.dir > 0 ? '▲' : '▼') : '';
     });
 
     sortedEntries.forEach((entry, idx) => {
@@ -4319,13 +4446,18 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
 
       const row = document.createElement('div');
       row.className = 'log-row';
+      if (entry.date) row.dataset.iso = entry.date;
+      row.dataset.id = entry.id;
+      row.tabIndex = 0;
+      row.setAttribute('role', 'button');
+      row.title = 'Click to edit this day';
+      if (entry.id === logEditingId) row.classList.add('is-editing');
       row.innerHTML = `
-        <span class="log-day">${pad(idx + 1)}</span>
+        <span class="log-day" title="${entry.date ? new Date(entry.date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }) : 'No date'}">${pad(dayNumber.get(entry.id))}</span>
         <span class="log-clocked">${pad(entry.hh)}:${pad(entry.mm)}:${pad(entry.ss)}</span>
         <span class="log-target">${pad(entry.target)}</span>
         <span class="log-diff ${diffClass}">${formatDiffMinSec(diffSeconds)}</span>
         <span class="log-row-icons">
-          <button class="log-icon-btn" data-edit="${entry.id}" aria-label="Edit this entry">✍🏻</button>
           <button class="log-icon-btn" data-remove="${entry.id}" aria-label="Delete this entry">❌</button>
         </span>
       `;
@@ -4345,6 +4477,7 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
     logDateInput.value = entry.date || '';
     addLogEntryBtn.textContent = 'Update';
     addLogEntryBtn.classList.add('editing');
+    markEditingRow();
     logDuration.focus();
   }
 
@@ -4352,6 +4485,7 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
     logEditingId = null;
     addLogEntryBtn.textContent = '➕ Add Day';
     addLogEntryBtn.classList.remove('editing');
+    markEditingRow();
     logDuration.value = '';
     logDateInput.value = '';
   }
@@ -5226,10 +5360,12 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
     if (people.has(saved)) logBulkEmployeeSelect.value = saved;
 
     loadEmployeeRowIntoTextarea(logBulkEmployeeSelect.value, unreadable);
+    updateBulkReady();
   });
 
   logBulkEmployeeSelect.addEventListener('change', () => {
     loadEmployeeRowIntoTextarea(logBulkEmployeeSelect.value);
+    updateBulkReady();
   });
 
   logBulkImportBtn.addEventListener('click', () => {
@@ -5583,8 +5719,10 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
     // Deletes right away (no popup): the month's logged days, holidays and absences
     const gone = logEntries.filter(e => e.date && e.date.startsWith(key + '-'));
     const ids = new Set(gone.map(e => e.id));
-    [...holidays].filter(d => d.startsWith(key + '-')).forEach(d => holidays.delete(d));
-    [...absentDays].filter(d => d.startsWith(key + '-')).forEach(d => absentDays.delete(d));
+    const goneHolidays = [...holidays].filter(d => d.startsWith(key + '-'));
+    const goneAbsences = [...absentDays].filter(d => d.startsWith(key + '-'));
+    goneHolidays.forEach(d => holidays.delete(d));
+    goneAbsences.forEach(d => absentDays.delete(d));
     saveHolidays();
     saveAbsent();
     logEntries = logEntries.filter(e => !ids.has(e.id));
@@ -5594,7 +5732,14 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
     renderLogList();
     calculateLog();
     renderMyMonth();
-    toast('🗑️ Month deleted');
+    toast('🗑️ Month deleted', () => {
+      goneHolidays.forEach(d => holidays.add(d));
+      goneAbsences.forEach(d => absentDays.add(d));
+      saveHolidays();
+      saveAbsent();
+      restoreLogEntries(gone);
+      toast('↩️ Month restored');
+    });
   });
 
   targetHoursInput.addEventListener('input', renderMyMonth);
@@ -5627,24 +5772,42 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
   document.getElementById('holidayList').addEventListener('click', e => {
     const btn = e.target.closest('button[data-date]');
     if (!btn) return;
-    holidays.delete(btn.dataset.date);
-    absentDays.delete(btn.dataset.date);
+    const day = btn.dataset.date, wasHoliday = holidays.has(day), wasAbsent = absentDays.has(day);
+    holidays.delete(day);
+    absentDays.delete(day);
     saveHolidays();
     saveAbsent();
     renderHolidayModal();
     renderMyMonth();
-    toast('Day removed');
+    toast('Day removed', () => {
+      if (wasHoliday) holidays.add(day);
+      if (wasAbsent) absentDays.add(day);
+      saveHolidays();
+      saveAbsent();
+      renderHolidayModal();
+      renderMyMonth();
+      toast('↩️ Day restored');
+    });
   });
 
   document.getElementById('holidayClearBtn').addEventListener('click', () => {
     const { y, m } = selectedMonth();
-    holidaysInMonth(y, m).forEach(d => holidays.delete(d));
-    absencesInMonth(y, m).forEach(d => absentDays.delete(d));
+    const goneHolidays = holidaysInMonth(y, m), goneAbsences = absencesInMonth(y, m);
+    goneHolidays.forEach(d => holidays.delete(d));
+    goneAbsences.forEach(d => absentDays.delete(d));
     saveHolidays();
     saveAbsent();
     renderHolidayModal();
     renderMyMonth();
-    toast('🗑️ Month cleared of holidays and absences');
+    toast('🗑️ Month cleared of holidays and absences', () => {
+      goneHolidays.forEach(d => holidays.add(d));
+      goneAbsences.forEach(d => absentDays.add(d));
+      saveHolidays();
+      saveAbsent();
+      renderHolidayModal();
+      renderMyMonth();
+      toast('↩️ Holidays and absences restored');
+    });
   });
 
   // ========================================================================
@@ -5735,12 +5898,40 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
   const fmtClock = ms => new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   const CONFLICT_TEXT = 'Both this device and the cloud changed since the last sync. Choose Upload to keep this device\'s data, or Restore to take the cloud copy.';
 
-  function toast(text) {
+  // toast(text) shows a message; toast(text, undoFn) also shows an Undo button for a few seconds
+  var pendingUndo = null;
+  function toast(text, undo) {
     const t = document.getElementById('cmoToast');
     t.textContent = text;
+    pendingUndo = typeof undo === 'function' ? undo : null;
+    t.classList.toggle('has-undo', !!pendingUndo);
+    if (pendingUndo) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'cmo-toast-undo';
+      b.textContent = 'Undo';
+      b.addEventListener('click', runUndo);
+      t.appendChild(b);
+    }
     t.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+    toastTimer = setTimeout(() => { t.classList.remove('show'); pendingUndo = null; }, pendingUndo ? 7000 : 3200);
+  }
+  function runUndo() {
+    const fn = pendingUndo;
+    if (!fn) return;
+    pendingUndo = null;
+    clearTimeout(toastTimer);
+    document.getElementById('cmoToast').classList.remove('show');
+    fn();
+  }
+  function restoreLogEntries(list) {
+    const have = new Set(logEntries.map(e => e.id));
+    list.forEach(e => { if (!have.has(e.id)) logEntries.push(e); });
+    saveLogEntries();
+    renderLogList();
+    calculateLog();
+    renderMyMonth();
   }
 
   function cloudMsg(text, bad) {
@@ -5812,6 +6003,104 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
   setInterval(refreshCloudUI, 5000);
 
   if (window.clkLoadNote) { setCloudFlash('err', 6000); setTimeout(() => toast(window.clkLoadNote), 600); }
+
+  document.addEventListener('keydown', e => {
+    if (!pendingUndo || e.key.toLowerCase() !== 'z' || !(e.ctrlKey || e.metaKey) || e.shiftKey) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return; // leave normal text undo alone
+    e.preventDefault();
+    runUndo();
+  });
+
+  // Clear Log: removes every day shown in the Table View, after a warning
+  const clearLogOverlay = document.getElementById('clearLogOverlay');
+  const closeClearLog = () => { clearLogOverlay.style.display = 'none'; };
+  document.getElementById('logClearBtn').addEventListener('click', () => {
+    const list = entriesInTableMonth();
+    if (!list.length) return;
+    const { y, m } = tableMonth();
+    const label = new Date(y, m, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    const n = list.length, days = `${n} logged day${n === 1 ? '' : 's'}`;
+    document.getElementById('clearLogTitle').textContent = `⚠️ Clear ${label}?`;
+    document.getElementById('clearLogLead').innerHTML = `This permanently deletes <b>${days}</b> from ${label}:`;
+    document.getElementById('clearLogConfirmBtn').textContent = `🗑️ Clear ${n} day${n === 1 ? '' : 's'}`;
+    clearLogOverlay.style.display = 'flex';
+    document.getElementById('clearLogCancelBtn').focus();
+  });
+  document.getElementById('clearLogConfirmBtn').addEventListener('click', () => {
+    const ids = new Set(entriesInTableMonth().map(e => e.id));
+    const removed = logEntries.filter(e => ids.has(e.id));
+    logEntries = logEntries.filter(e => !ids.has(e.id));
+    if (logEditingId !== null && ids.has(logEditingId)) cancelEditLogEntry();
+    closeClearLog();
+    saveLogEntries();
+    renderLogList();
+    calculateLog();
+    renderMyMonth();
+    toast(`🗑️ Cleared ${ids.size} day${ids.size === 1 ? '' : 's'} from the log`, () => { restoreLogEntries(removed); toast(`↩️ ${removed.length} day${removed.length === 1 ? '' : 's'} restored`); });
+  });
+  document.getElementById('clearLogCloseBtn').addEventListener('click', closeClearLog);
+  document.getElementById('clearLogCancelBtn').addEventListener('click', closeClearLog);
+  clearLogOverlay.addEventListener('click', e => { if (e.target === clearLogOverlay) closeClearLog(); });
+
+  // Bulk Import: the Import button stays off until there is something to import
+  function updateBulkReady() {
+    const lines = logBulkArea.value.split('\n').filter(l => l.trim());
+    const valid = lines.filter(l => { const p = parseBulkLine(l); return p && p.date; }).length;
+    const skipped = lines.length - valid;
+    const ready = valid > 0 || !!uploadedToday;
+    logBulkImportBtn.disabled = !ready;
+    logBulkImportBtn.textContent = valid > 0 ? `Import ${valid} day${valid === 1 ? '' : 's'}` : 'Import';
+    const note = document.getElementById('bulkCount');
+    note.className = 'bulk-count' + (ready ? ' ready' : '');
+    note.textContent = lines.length === 0
+      ? (uploadedToday ? 'Today\'s clock-in from the sheet is ready to import.' : 'Nothing to import yet. Upload a sheet or paste entries.')
+      : valid === 0
+        ? 'No valid entries yet. Check the format: 8h 30m 0s, 8, 15-10-2026'
+        : `${valid} valid ${valid === 1 ? 'entry' : 'entries'}${skipped ? ` · ${skipped} line${skipped === 1 ? '' : 's'} will be skipped` : ''}`;
+  }
+  (function () { // refresh the button whenever the box changes, including when the app fills it from a sheet
+    const d = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
+    Object.defineProperty(logBulkArea, 'value', { configurable: true, get() { return d.get.call(this); }, set(v) { d.set.call(this, v); updateBulkReady(); } });
+  })();
+  logBulkArea.addEventListener('input', updateBulkReady);
+  const baseResetBulk = resetBulkImport;
+  resetBulkImport = function () { baseResetBulk(); updateBulkReady(); };
+  ['dragenter', 'dragover'].forEach(t => logBulkUploadBtn.addEventListener(t, e => { e.preventDefault(); logBulkUploadBtn.classList.add('drag'); }));
+  ['dragleave', 'drop'].forEach(t => logBulkUploadBtn.addEventListener(t, e => { e.preventDefault(); logBulkUploadBtn.classList.remove('drag'); }));
+  logBulkUploadBtn.addEventListener('drop', e => {
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || !files.length) return;
+    ensureXlsx();
+    logBulkFileInput.files = files;
+    logBulkFileInput.dispatchEvent(new Event('change'));
+  });
+  updateBulkReady();
+  updateClearLogBtn();
+
+  // Click a column title to sort the table; click again to reverse
+  document.getElementById('logSortHeader').addEventListener('click', e => {
+    const btn = e.target.closest('[data-sort]');
+    if (!btn) return;
+    const key = btn.dataset.sort, cur = currentSort();
+    logSort = cur.key === key ? { key, dir: -cur.dir } : { key, dir: key === 'date' || key === 'target' ? 1 : -1 };
+    try { localStorage.setItem('cmoLogSort', JSON.stringify(logSort)); } catch (err) { /* storage unavailable */ }
+    renderLogList();
+  });
+
+  // Hovering a calendar day highlights its row in the table, and hovering a row highlights its day in the calendar
+  function linkHighlight(iso, on) {
+    if (!iso) return;
+    document.querySelectorAll(`#logEntriesContainer [data-iso="${iso}"], #calendarGrid [data-iso="${iso}"], #calendarList [data-iso="${iso}"]`)
+      .forEach(el => el.classList.toggle('link-hl', on));
+  }
+  [calendarGrid, calendarList, logEntriesContainer].forEach(box => {
+    const on = e => { const t = e.target.closest('[data-iso]'); if (t) linkHighlight(t.dataset.iso, true); };
+    const off = e => { const t = e.target.closest('[data-iso]'); if (t) linkHighlight(t.dataset.iso, false); };
+    box.addEventListener('mouseover', on);
+    box.addEventListener('mouseout', off);
+    box.addEventListener('focusin', on);
+    box.addEventListener('focusout', off);
+  });
 
   // Actions that reload the page (restore, flush) leave their message for the next load
   try {
@@ -5915,6 +6204,8 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
     setMonthMenuOpen(false);
     let closed = false;
     if (resetOverlay.style.display === 'flex') { closeResetModal(); closed = true; }
+    const clearOverlay = document.getElementById('clearLogOverlay');
+    if (clearOverlay.style.display === 'flex') { clearOverlay.style.display = 'none'; closed = true; }
     if (document.getElementById('holidayOverlay').style.display === 'flex') { closeHolidayModal(); closed = true; }
     if (!closed && currentView === 'settings') leaveSettings();
   });
