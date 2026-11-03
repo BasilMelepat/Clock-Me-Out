@@ -233,6 +233,7 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
     --page-b: #060D16;
     --page-rgb: 11, 22, 34;
     --sky-rgb: 79, 168, 232;
+    --skyd-rgb: 95, 184, 255;
     --glow-rgb: 79, 168, 232;
     --shadow-rgb: 11, 42, 74;
     --hero-a: #0B2A4A;
@@ -1255,7 +1256,7 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
     color: var(--deep);
   }
   body.dark-mode .calendar-cell.today.live,
-  body.dark-mode .calendar-cell.today.live:hover { --live-fill: rgba(95, 184, 255, 0.45); }
+  body.dark-mode .calendar-cell.today.live:hover { --live-fill: rgba(var(--skyd-rgb), 0.45); }
   .calendar-cell.today.live.live-done,
   .calendar-cell.today.live.live-done:hover {
     --live-fill: rgba(30, 142, 90, 0.4);
@@ -2139,6 +2140,17 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
   .calendar-cell.link-hl:not(.empty) { z-index: 2; border-radius: 50%; transform: translateY(-3px) scale(1.1); box-shadow: 0 10px 20px rgba(var(--shadow-rgb), 0.16); background: var(--sky-light); }
   @media (max-width: 780px) { #logListWrap .log-list-header, #logListWrap .log-row { grid-template-columns: 32px 1fr 44px 58px 40px; } }
   @media (prefers-reduced-motion: reduce) { .log-row.link-hl, .calendar-cell.link-hl:not(.empty) { transform: none; } }
+
+  /* ===== v3.9.0: today's row in the calendar's List view shows live shift progress ===== */
+  .cal-list .log-row.today.live, .cal-list .log-row.today.live:hover {
+    --live-fill: rgba(var(--sky-rgb), 0.38);
+    background: linear-gradient(to right, var(--live-fill) var(--live-pct, 0%), var(--surface) var(--live-pct, 0%));
+  }
+  body.dark-mode .cal-list .log-row.today.live, body.dark-mode .cal-list .log-row.today.live:hover { --live-fill: rgba(var(--skyd-rgb), 0.42); }
+  .cal-list .log-row.today.live.live-done, .cal-list .log-row.today.live.live-done:hover { --live-fill: rgba(30, 142, 90, 0.3); box-shadow: 0 0 0 1.5px var(--good) inset; }
+  body.dark-mode .cal-list .log-row.today.live.live-done, body.dark-mode .cal-list .log-row.today.live.live-done:hover { --live-fill: rgba(62, 208, 138, 0.34); }
+  .cal-list .log-row.today.live .cal-st { color: var(--deep); }
+  /* ===== v3.9.0: calendar List view: today's row shows live shift progress ===== */
   /* ===== v3.8.0: six colour themes (Ocean, Forest, Sunset, Grape, Rose, Slate), each light and dark, chosen in Settings ===== */
   /* ===== v3.7.0: Settings: profile with Google photo and Sign out, redesigned name field, Cloud and Offline backups in one card ===== */
   /* ===== v3.6.1: the "Daily Work Log" card is now titled "Log a Day" ===== */
@@ -2190,16 +2202,16 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
   @media (max-width: 700px) { .wrap-settings .fx-cards { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); } }
 
   /* ===== v3.8.0: six colour themes, each with a light and a dark look (pick in Settings) ===== */
-  body.theme-forest { --deep: #12452D; --deep2: #196240; --sky: #2C9664; --sky-light: #EAFAF3; --ink: #12452D; --muted: #4F7D68; --line: #DBF0E6; --card: #FFFFFF; --surface: #FAFFFD; --sky-dark: #1E6745; --sky-mid: #215A3F; --page-a: #0D2118; --page-b: #06130D; --page-rgb: 13, 33, 24; --sky-rgb: 44, 150, 100; --glow-rgb: 44, 150, 100; --shadow-rgb: 18, 69, 45; --hero-a: #12452D; --hero-b: #196240; }
-  body.theme-forest.dark-mode { --deep: #E7F9F0; --deep2: #C7EBDA; --sky: #54D498; --sky-light: #1B3C2C; --ink: #E7F9F0; --muted: #9AC1AF; --line: #2D5241; --card: #132F22; --surface: #1B3C2C; --sky-dark: #2FBC7A; --sky-mid: #215A3F; --page-a: #0D2118; --page-b: #06130D; --page-rgb: 13, 33, 24; --sky-rgb: 84, 212, 152; --glow-rgb: 116, 220, 172; --shadow-rgb: 18, 69, 45; --hero-a: #12452D; --hero-b: #196240; }
-  body.theme-sunset { --deep: #48260F; --deep2: #663515; --sky: #F06F19; --sky-light: #FBF0E9; --ink: #48260F; --muted: #80614C; --line: #F2E3D9; --card: #FFFFFF; --surface: #FFFCFA; --sky-dark: #C0540C; --sky-mid: #5D371D; --page-a: #22150C; --page-b: #140B06; --page-rgb: 34, 21, 12; --sky-rgb: 240, 111, 25; --glow-rgb: 240, 111, 25; --shadow-rgb: 72, 38, 15; --hero-a: #48260F; --hero-b: #663515; }
-  body.theme-sunset.dark-mode { --deep: #FAEEE6; --deep2: #EDD5C5; --sky: #FA8C42; --sky-light: #3E2819; --ink: #FAEEE6; --muted: #C3A998; --line: #543C2B; --card: #311E11; --surface: #3E2819; --sky-dark: #F96706; --sky-mid: #5D371D; --page-a: #22150C; --page-b: #140B06; --page-rgb: 34, 21, 12; --sky-rgb: 250, 140, 66; --glow-rgb: 251, 164, 106; --shadow-rgb: 72, 38, 15; --hero-a: #48260F; --hero-b: #663515; }
-  body.theme-grape { --deep: #2A1245; --deep2: #3B1962; --sky: #9054D4; --sky-light: #F2EAFA; --ink: #2A1245; --muted: #644F7D; --line: #E5DBF0; --card: #FFFFFF; --surface: #FCFAFF; --sky-dark: #712FBC; --sky-mid: #3B215A; --page-a: #160D21; --page-b: #0C0613; --page-rgb: 22, 13, 33; --sky-rgb: 144, 84, 212; --glow-rgb: 144, 84, 212; --shadow-rgb: 42, 18, 69; --hero-a: #2A1245; --hero-b: #3B1962; }
-  body.theme-grape.dark-mode { --deep: #EFE7F9; --deep2: #D8C7EB; --sky: #B377F8; --sky-light: #2A1B3C; --ink: #EFE7F9; --muted: #AC9AC1; --line: #3F2D52; --card: #20132F; --surface: #2A1B3C; --sky-dark: #933DF5; --sky-mid: #3B215A; --page-a: #160D21; --page-b: #0C0613; --page-rgb: 22, 13, 33; --sky-rgb: 179, 119, 248; --glow-rgb: 201, 158, 250; --shadow-rgb: 42, 18, 69; --hero-a: #2A1245; --hero-b: #3B1962; }
-  body.theme-rose { --deep: #471022; --deep2: #641730; --sky: #DD4075; --sky-light: #FBEAEF; --ink: #471022; --muted: #7F4D5E; --line: #F1DAE2; --card: #FFFFFF; --surface: #FFFAFC; --sky-dark: #BF2256; --sky-mid: #5B1F33; --page-a: #210D14; --page-b: #13060B; --page-rgb: 33, 13, 20; --sky-rgb: 221, 64, 117; --glow-rgb: 221, 64, 117; --shadow-rgb: 71, 16, 34; --hero-a: #471022; --hero-b: #641730; }
-  body.theme-rose.dark-mode { --deep: #F9E6ED; --deep2: #ECC6D2; --sky: #FB6A9A; --sky-light: #3D1A25; --ink: #F9E6ED; --muted: #C299A7; --line: #532C39; --card: #30121C; --surface: #3D1A25; --sky-dark: #FA2E72; --sky-mid: #5B1F33; --page-a: #210D14; --page-b: #13060B; --page-rgb: 33, 13, 20; --sky-rgb: 251, 106, 154; --glow-rgb: 252, 146, 181; --shadow-rgb: 71, 16, 34; --hero-a: #471022; --hero-b: #641730; }
-  body.theme-slate { --deep: #212A36; --deep2: #2E3B4C; --sky: #546C8C; --sky-light: #EFF2F6; --ink: #212A36; --muted: #5C6470; --line: #E1E5EA; --card: #FFFFFF; --surface: #FCFCFD; --sky-dark: #3D4E66; --sky-mid: #313B49; --page-a: #13161B; --page-b: #0A0C0F; --page-rgb: 19, 22, 27; --sky-rgb: 84, 108, 140; --glow-rgb: 84, 108, 140; --shadow-rgb: 33, 42, 54; --hero-a: #212A36; --hero-b: #2E3B4C; }
-  body.theme-slate.dark-mode { --deep: #ECEFF3; --deep2: #D1D8E0; --sky: #86A3CB; --sky-light: #252A32; --ink: #ECEFF3; --muted: #A5ACB5; --line: #383E47; --card: #1B2027; --surface: #252A32; --sky-dark: #5B82B9; --sky-mid: #313B49; --page-a: #13161B; --page-b: #0A0C0F; --page-rgb: 19, 22, 27; --sky-rgb: 134, 163, 203; --glow-rgb: 162, 184, 215; --shadow-rgb: 33, 42, 54; --hero-a: #212A36; --hero-b: #2E3B4C; }
+  body.theme-forest { --deep: #12452D; --deep2: #196240; --sky: #2C9664; --sky-light: #EAFAF3; --ink: #12452D; --muted: #4F7D68; --line: #DBF0E6; --card: #FFFFFF; --surface: #FAFFFD; --sky-dark: #1E6745; --sky-mid: #215A3F; --page-a: #0D2118; --page-b: #06130D; --page-rgb: 13, 33, 24; --sky-rgb: 44, 150, 100; --glow-rgb: 44, 150, 100; --shadow-rgb: 18, 69, 45; --hero-a: #12452D; --hero-b: #196240; --skyd-rgb: 44, 150, 100; }
+  body.theme-forest.dark-mode { --deep: #E7F9F0; --deep2: #C7EBDA; --sky: #54D498; --sky-light: #1B3C2C; --ink: #E7F9F0; --muted: #9AC1AF; --line: #2D5241; --card: #132F22; --surface: #1B3C2C; --sky-dark: #2FBC7A; --sky-mid: #215A3F; --page-a: #0D2118; --page-b: #06130D; --page-rgb: 13, 33, 24; --sky-rgb: 84, 212, 152; --glow-rgb: 116, 220, 172; --shadow-rgb: 18, 69, 45; --hero-a: #12452D; --hero-b: #196240; --skyd-rgb: 84, 212, 152; }
+  body.theme-sunset { --deep: #48260F; --deep2: #663515; --sky: #F06F19; --sky-light: #FBF0E9; --ink: #48260F; --muted: #80614C; --line: #F2E3D9; --card: #FFFFFF; --surface: #FFFCFA; --sky-dark: #C0540C; --sky-mid: #5D371D; --page-a: #22150C; --page-b: #140B06; --page-rgb: 34, 21, 12; --sky-rgb: 240, 111, 25; --glow-rgb: 240, 111, 25; --shadow-rgb: 72, 38, 15; --hero-a: #48260F; --hero-b: #663515; --skyd-rgb: 240, 111, 25; }
+  body.theme-sunset.dark-mode { --deep: #FAEEE6; --deep2: #EDD5C5; --sky: #FA8C42; --sky-light: #3E2819; --ink: #FAEEE6; --muted: #C3A998; --line: #543C2B; --card: #311E11; --surface: #3E2819; --sky-dark: #F96706; --sky-mid: #5D371D; --page-a: #22150C; --page-b: #140B06; --page-rgb: 34, 21, 12; --sky-rgb: 250, 140, 66; --glow-rgb: 251, 164, 106; --shadow-rgb: 72, 38, 15; --hero-a: #48260F; --hero-b: #663515; --skyd-rgb: 250, 140, 66; }
+  body.theme-grape { --deep: #2A1245; --deep2: #3B1962; --sky: #9054D4; --sky-light: #F2EAFA; --ink: #2A1245; --muted: #644F7D; --line: #E5DBF0; --card: #FFFFFF; --surface: #FCFAFF; --sky-dark: #712FBC; --sky-mid: #3B215A; --page-a: #160D21; --page-b: #0C0613; --page-rgb: 22, 13, 33; --sky-rgb: 144, 84, 212; --glow-rgb: 144, 84, 212; --shadow-rgb: 42, 18, 69; --hero-a: #2A1245; --hero-b: #3B1962; --skyd-rgb: 144, 84, 212; }
+  body.theme-grape.dark-mode { --deep: #EFE7F9; --deep2: #D8C7EB; --sky: #B377F8; --sky-light: #2A1B3C; --ink: #EFE7F9; --muted: #AC9AC1; --line: #3F2D52; --card: #20132F; --surface: #2A1B3C; --sky-dark: #933DF5; --sky-mid: #3B215A; --page-a: #160D21; --page-b: #0C0613; --page-rgb: 22, 13, 33; --sky-rgb: 179, 119, 248; --glow-rgb: 201, 158, 250; --shadow-rgb: 42, 18, 69; --hero-a: #2A1245; --hero-b: #3B1962; --skyd-rgb: 179, 119, 248; }
+  body.theme-rose { --deep: #471022; --deep2: #641730; --sky: #DD4075; --sky-light: #FBEAEF; --ink: #471022; --muted: #7F4D5E; --line: #F1DAE2; --card: #FFFFFF; --surface: #FFFAFC; --sky-dark: #BF2256; --sky-mid: #5B1F33; --page-a: #210D14; --page-b: #13060B; --page-rgb: 33, 13, 20; --sky-rgb: 221, 64, 117; --glow-rgb: 221, 64, 117; --shadow-rgb: 71, 16, 34; --hero-a: #471022; --hero-b: #641730; --skyd-rgb: 221, 64, 117; }
+  body.theme-rose.dark-mode { --deep: #F9E6ED; --deep2: #ECC6D2; --sky: #FB6A9A; --sky-light: #3D1A25; --ink: #F9E6ED; --muted: #C299A7; --line: #532C39; --card: #30121C; --surface: #3D1A25; --sky-dark: #FA2E72; --sky-mid: #5B1F33; --page-a: #210D14; --page-b: #13060B; --page-rgb: 33, 13, 20; --sky-rgb: 251, 106, 154; --glow-rgb: 252, 146, 181; --shadow-rgb: 71, 16, 34; --hero-a: #471022; --hero-b: #641730; --skyd-rgb: 251, 106, 154; }
+  body.theme-slate { --deep: #212A36; --deep2: #2E3B4C; --sky: #546C8C; --sky-light: #EFF2F6; --ink: #212A36; --muted: #5C6470; --line: #E1E5EA; --card: #FFFFFF; --surface: #FCFCFD; --sky-dark: #3D4E66; --sky-mid: #313B49; --page-a: #13161B; --page-b: #0A0C0F; --page-rgb: 19, 22, 27; --sky-rgb: 84, 108, 140; --glow-rgb: 84, 108, 140; --shadow-rgb: 33, 42, 54; --hero-a: #212A36; --hero-b: #2E3B4C; --skyd-rgb: 84, 108, 140; }
+  body.theme-slate.dark-mode { --deep: #ECEFF3; --deep2: #D1D8E0; --sky: #86A3CB; --sky-light: #252A32; --ink: #ECEFF3; --muted: #A5ACB5; --line: #383E47; --card: #1B2027; --surface: #252A32; --sky-dark: #5B82B9; --sky-mid: #313B49; --page-a: #13161B; --page-b: #0A0C0F; --page-rgb: 19, 22, 27; --sky-rgb: 134, 163, 203; --glow-rgb: 162, 184, 215; --shadow-rgb: 33, 42, 54; --hero-a: #212A36; --hero-b: #2E3B4C; --skyd-rgb: 134, 163, 203; }
   .sw-ocean { --sw-card: #FFFFFF; --sw-line: #D7E6F2; --sw-ink: #0B2A4A; --sw-sky: #4FA8E8; --sw-deep: #0F3A63; --sw-ring: rgba(79, 168, 232, 0.28); }
   body.dark-mode .sw-ocean { --sw-card: #101E30; --sw-line: #2A3F55; --sw-ink: #E8F1FA; --sw-sky: #5FB8FF; --sw-deep: #C9DDEF; --sw-ring: rgba(95, 184, 255, 0.28); }
   .sw-forest { --sw-card: #FFFFFF; --sw-line: #DBF0E6; --sw-ink: #12452D; --sw-sky: #2C9664; --sw-deep: #196240; --sw-ring: rgba(44, 150, 100, 0.28); }
@@ -2230,7 +2242,7 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
     <span class="brand-mark" id="brandMark" aria-hidden="true">🖥️</span>
     <span class="brand-text">
       <span class="app-header-title" id="brandTitle" role="link" tabindex="0" title="Go to Shift Details">Clock me Out</span>
-      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.8.0</span></span>
+      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.9.0</span></span>
     </span>
   </div>
   <div class="view-bar" id="viewBar" data-view="overview">
@@ -4844,7 +4856,35 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
     calendarMonth = refDate.getMonth();
   }
 
+  // Today's row in the List view: same live fill as today's cell in the grid, plus the progress in its status text
+  function applyCalendarListLive() {
+    const row = document.querySelector('#calendarList .cal-row.today');
+    if (!row) return;
+    const st = row.querySelector('.cal-st');
+    if (calLiveProgress === null) {
+      if (row.classList.contains('live')) {
+        row.classList.remove('live', 'live-done');
+        row.style.removeProperty('--live-pct');
+        if (row._baseTitle !== undefined) row.title = row._baseTitle;
+        if (st && row._baseLabel !== undefined) { st.textContent = row._baseLabel; st.className = row._baseStCls; }
+      }
+      return;
+    }
+    if (row._baseTitle === undefined) { row._baseTitle = row.title; row._baseLabel = st ? st.textContent : ''; row._baseStCls = st ? st.className : ''; }
+    row.classList.add('live');
+    row.classList.toggle('live-done', calLiveProgress >= 100);
+    row.style.setProperty('--live-pct', calLiveProgress.toFixed(2) + '%');
+    const t = `Today: ${Math.floor(calLiveProgress)}% of shift done.`;
+    if (row.title !== t) row.title = t;
+    // Only a day with nothing logged yet gets the progress wording; a logged day keeps "Present"
+    if (st && row._baseStCls.includes('pending')) {
+      const label = calLiveProgress >= 100 ? 'Shift complete · 100%' : `In progress · ${Math.floor(calLiveProgress)}%`;
+      if (st.textContent !== label) st.textContent = label;
+    }
+  }
+
   function applyCalendarLive() {
+    applyCalendarListLive();
     if (!calTodayCell || !calTodayCell.isConnected) calTodayCell = document.querySelector('#calendarGrid .calendar-cell.today');
     const cell = calTodayCell;
     if (!cell) return;
