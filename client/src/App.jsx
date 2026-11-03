@@ -58,7 +58,7 @@ export default function App() {
       }
       localStorage.setItem("clk_last", String(Date.now()));
       localStorage.setItem("clk_uid", user.id);
-      writeJSON("clk_user", { name: user.name, email: user.email });
+      writeJSON("clk_user", { name: user.name, email: user.email, picture: user.picture });
       localStorage.setItem("clk_api", API_BASE);
       window.location.replace("/app.html");
     } catch (e) {

@@ -8,6 +8,8 @@ import "./styles.css";
 // Same light/dark choice the app itself uses.
 try {
   if (localStorage.getItem("cmoTheme") === "dark") document.body.classList.add("dark-mode");
+  const color = localStorage.getItem("cmoThemeColor");
+  if (color && /^[a-z]+$/.test(color) && color !== "ocean") document.body.classList.add("theme-" + color);
 } catch { /* storage unavailable */ }
 
 const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
