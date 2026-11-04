@@ -35,3 +35,8 @@ if (isAdmin) {
     )}
   </React.StrictMode>
 );
+
+// Lets the app be installed and opened offline
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+}

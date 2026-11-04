@@ -195,6 +195,10 @@ window.clkStartApp = function () {
 };
 setTimeout(function () { window.clkStartApp(); }, 12000); // safety net: never leave the app stuck on the loading screen
 if (window.clkPreview) window.clkStartApp();
+// Installable app: keep the browser's install prompt for the Settings button, and register the offline service worker
+window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.clkInstallEvent = e; window.dispatchEvent(new Event('clk-install-ready')); });
+window.addEventListener('appinstalled', function () { window.clkInstallEvent = null; window.dispatchEvent(new Event('clk-installed')); });
+if ('serviceWorker' in navigator && !window.clkPreview) window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
 </script>
 <style>
 #clkSplash { position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; background: linear-gradient(160deg, #EAF4FC 0%, #FFFFFF 55%); color: #0B2A4A; font-family: 'Inter', system-ui, sans-serif; }
@@ -209,7 +213,15 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Clock me Out</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%96%A5%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#EAF4FC">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Clock me Out">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="/icons/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -2141,6 +2153,9 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
   @media (max-width: 780px) { #logListWrap .log-list-header, #logListWrap .log-row { grid-template-columns: 32px 1fr 44px 58px 40px; } }
   @media (prefers-reduced-motion: reduce) { .log-row.link-hl, .calendar-cell.link-hl:not(.empty) { transform: none; } }
 
+
+  /* ===== v3.10.0: installable app ===== */
+  #installBlock[hidden], #installBtn[hidden] { display: none; }
   /* ===== v3.9.0: today's row in the calendar's List view shows live shift progress ===== */
   .cal-list .log-row.today.live, .cal-list .log-row.today.live:hover {
     --live-fill: rgba(var(--sky-rgb), 0.38);
@@ -2150,6 +2165,7 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
   .cal-list .log-row.today.live.live-done, .cal-list .log-row.today.live.live-done:hover { --live-fill: rgba(30, 142, 90, 0.3); box-shadow: 0 0 0 1.5px var(--good) inset; }
   body.dark-mode .cal-list .log-row.today.live.live-done, body.dark-mode .cal-list .log-row.today.live.live-done:hover { --live-fill: rgba(62, 208, 138, 0.34); }
   .cal-list .log-row.today.live .cal-st { color: var(--deep); }
+  /* ===== v3.10.0: installable app (PWA): manifest, icons, offline service worker, Install button in Settings ===== */
   /* ===== v3.9.0: calendar List view: today's row shows live shift progress ===== */
   /* ===== v3.8.0: six colour themes (Ocean, Forest, Sunset, Grape, Rose, Slate), each light and dark, chosen in Settings ===== */
   /* ===== v3.7.0: Settings: profile with Google photo and Sign out, redesigned name field, Cloud and Offline backups in one card ===== */
@@ -2242,7 +2258,7 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
     <span class="brand-mark" id="brandMark" aria-hidden="true">🖥️</span>
     <span class="brand-text">
       <span class="app-header-title" id="brandTitle" role="link" tabindex="0" title="Go to Shift Details">Clock me Out</span>
-      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.9.0</span></span>
+      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.10.0</span></span>
     </span>
   </div>
   <div class="view-bar" id="viewBar" data-view="overview">
@@ -2645,6 +2661,13 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
         <button class="me-save-btn" id="meNameSave" type="button">Save</button>
       </div>
       <p class="me-hint" id="meNameHint">Tip: upload your attendance sheet in Bulk Import and your name is picked up automatically.</p>
+    </div>
+    <div class="settings-block" id="installBlock" hidden>
+      <label>📲 Install app <small>works like a normal app</small></label>
+      <div class="settings-row">
+        <button class="me-link-btn" id="installBtn" type="button" hidden>📲 Install Clock me Out</button>
+      </div>
+      <p class="me-hint" id="installHint"></p>
     </div>
 
     </section>
@@ -6233,6 +6256,31 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
   updateBulkReady();
   updateClearLogBtn();
 
+  // Install as an app (PWA)
+  const installBlock = document.getElementById('installBlock'), installBtn = document.getElementById('installBtn'), installHint = document.getElementById('installHint');
+  const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  function refreshInstallUi() {
+    const can = !!window.clkInstallEvent;
+    installBlock.hidden = isStandalone() || !(can || isIos);
+    installBtn.hidden = !can;
+    installHint.textContent = can
+      ? 'Add Clock me Out to your home screen or desktop. It opens in its own window, starts fast, and still opens when you are offline.'
+      : 'On iPhone or iPad: tap the Share button, then "Add to Home Screen".';
+  }
+  installBtn.addEventListener('click', async () => {
+    const ev = window.clkInstallEvent;
+    if (!ev) return;
+    ev.prompt();
+    const choice = await ev.userChoice;
+    window.clkInstallEvent = null;
+    refreshInstallUi();
+    toast(choice.outcome === 'accepted' ? '📲 Installing Clock me Out…' : 'Install cancelled');
+  });
+  window.addEventListener('clk-install-ready', refreshInstallUi);
+  window.addEventListener('clk-installed', () => { refreshInstallUi(); toast('✅ Clock me Out is installed'); });
+  refreshInstallUi();
+
   // Colour themes: six palettes, each with a light and a dark look (saved on this device)
   const THEMES = ['ocean', 'forest', 'sunset', 'grape', 'rose', 'slate'];
   function currentThemeColor() { return THEMES.find(t => document.body.classList.contains('theme-' + t)) || 'ocean'; }
@@ -6240,6 +6288,15 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
     const dark = document.body.classList.contains('dark-mode'), cur = currentThemeColor();
     document.querySelectorAll('#themeBlock [data-mode]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.mode === 'dark') === dark)));
     document.querySelectorAll('#themeGrid [data-theme]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.theme === cur)));
+    updateThemeColor();
+  }
+  // The browser / phone status bar follows the chosen theme
+  function updateThemeColor() {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) return;
+    const cs = getComputedStyle(document.body);
+    const c = cs.getPropertyValue(document.body.classList.contains('dark-mode') ? '--page-a' : '--sky-light').trim();
+    if (c) meta.setAttribute('content', c);
   }
   document.querySelectorAll('#themeGrid [data-theme]').forEach(b => b.addEventListener('click', () => {
     THEMES.forEach(t => document.body.classList.remove('theme-' + t));

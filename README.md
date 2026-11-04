@@ -6,7 +6,7 @@ React sign-in page · Express API · MongoDB.
 ```
 clock-me-out/
 ├── client/
-│   ├── public/app.html   the Clock me Out app (v3.9.0) with cloud sync and a "Sign out" row in Settings
+│   ├── public/app.html   the Clock me Out app (v3.10.0) with cloud sync and a "Sign out" row in Settings
 │   └── src/              sign-in page (Google or email) and the admin dashboard
 └── server/               Express API
 ```
@@ -15,6 +15,8 @@ clock-me-out/
 1. Open **https://clock-me-out.vercel.app**.
 2. Sign in with Google, or choose **Sign up** to create an account with your email and a password.
 3. You land in the app. Your data saves to your account automatically, so signing in on another device shows the same shifts and log.
+
+4. **Install it like an app (optional).** On a phone, use your browser's *Add to Home Screen* / *Install app*. On desktop Chrome or Edge, click the install icon in the address bar, or use **Settings → Profile → Install app**. It then opens in its own window, and the app itself still opens when you are offline (your data loads from the cloud, or the last copy on the device).
 
 Signing out is under **Settings → Cloud sync → Sign out**.
 
@@ -59,12 +61,12 @@ Open **https://clock-me-out.vercel.app/admin** and sign in with the admin email 
 | `PUT /api/state` | Replace the user's saved data |
 
 ## Versioning
-MAJOR.MINOR.PATCH, shown in the header badge (for example v3.9.0).
+MAJOR.MINOR.PATCH, shown in the header badge (for example v3.10.0).
 - **MAJOR:** a big redesign or a change that breaks saved data.
 - **MINOR:** a new feature.
 - **PATCH:** a fix or small tweak.
 
-Every release changes the number, including admin-only and server changes. To release, change the number in the badge (`id="versionBadge"` in `client/public/app.html`).
+Every release changes the number, including admin-only and server changes. To release, change the number in the badge (`id="versionBadge"` in `client/public/app.html`) and `VERSION` in `client/public/sw.js`, so installed copies refresh their offline files.
 
 ## Credits
 The mascot is based on [page-mascot](https://github.com/nilbuild/page-mascot) (MIT License, © Kamran Ahmed). Its sprite sheets are in `client/public/mascot-*.webp`.
