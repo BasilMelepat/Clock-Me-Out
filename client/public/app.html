@@ -189,25 +189,39 @@ window.clkStartApp = function () {
     run.text = el.text;
     el.parentNode.replaceChild(run, el);
     var splash = document.getElementById('clkSplash');
-    if (splash) splash.remove();
+    if (splash) { splash.classList.add('done'); setTimeout(function () { splash.remove(); }, 320); }
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
 };
 setTimeout(function () { window.clkStartApp(); }, 12000); // safety net: never leave the app stuck on the loading screen
-if (window.clkPreview) window.clkStartApp();
+if (window.clkPreview) setTimeout(function () { window.clkStartApp(); }, window.clkPreviewDelay || 0);
 // Installable app: keep the browser's install prompt for the Settings button, and register the offline service worker
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.clkInstallEvent = e; window.dispatchEvent(new Event('clk-install-ready')); });
 window.addEventListener('appinstalled', function () { window.clkInstallEvent = null; window.dispatchEvent(new Event('clk-installed')); });
 if ('serviceWorker' in navigator && !window.clkPreview) window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
 </script>
 <style>
-#clkSplash { position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; background: linear-gradient(160deg, #EAF4FC 0%, #FFFFFF 55%); color: #0B2A4A; font-family: 'Inter', system-ui, sans-serif; }
-body.dark-mode #clkSplash { background: linear-gradient(160deg, #0B1622 0%, #060D16 55%); color: #E8F1FA; }
-.clk-splash-card { display: flex; align-items: center; gap: 12px; padding: 16px 22px; border-radius: 16px; background: #FFFFFF; border: 1px solid #D7E6F2; box-shadow: 0 8px 30px rgba(11, 42, 74, 0.08); font-weight: 700; }
-body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
-.clk-splash-card span { font-size: 22px; animation: clkPulse 1.2s ease-in-out infinite; }
-@keyframes clkPulse { 50% { transform: translateY(-3px); opacity: 0.7; } }
-@media (prefers-reduced-motion: reduce) { .clk-splash-card span { animation: none; } }
+#clkSplash { position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; background: linear-gradient(160deg, var(--sky-light, #EAF4FC) 0%, var(--card, #FFFFFF) 55%); font-family: 'Inter', system-ui, sans-serif; transition: opacity 0.28s ease; }
+body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0B1622) 0%, var(--page-b, #060D16) 55%); }
+#clkSplash.done { opacity: 0; pointer-events: none; }
+
+.clk-load { display: grid; justify-items: center; gap: 14px; text-align: center; }
+.clk-logo { width: 96px; height: 96px; filter: drop-shadow(0 10px 22px rgba(var(--shadow-rgb, 11, 42, 74), 0.28)); animation: clkFloat 2.4s ease-in-out infinite; }
+.clk-word { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--deep, #0B2A4A); }
+.clk-msg { display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; color: var(--muted, #4A6580); }
+.clk-dots { display: inline-flex; gap: 3px; margin-left: 5px; }
+.clk-dots i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; animation: clkDot 1.2s ease-in-out infinite both; }
+.clk-dots i:nth-child(2) { animation-delay: 0.16s; } .clk-dots i:nth-child(3) { animation-delay: 0.32s; }
+.clk-arc, .clk-min, .clk-hr { transform-box: view-box; transform-origin: 50px 46px; }
+.clk-arc { animation: clkSpin 1.5s linear infinite; }
+.clk-min { animation: clkSpin 2.6s linear infinite; }
+.clk-hr { animation: clkSpin 30s linear infinite; }
+.clk-led { animation: clkBlink 1.2s ease-in-out infinite; }
+@keyframes clkSpin { to { transform: rotate(360deg); } }
+@keyframes clkFloat { 50% { transform: translateY(-5px); } }
+@keyframes clkDot { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+@keyframes clkBlink { 50% { opacity: 0.2; } }
+@media (prefers-reduced-motion: reduce) { .clk-logo, .clk-arc, .clk-min, .clk-hr, .clk-led, .clk-dots i { animation: none; } }
 </style>
 
 <meta charset="UTF-8">
@@ -1767,7 +1781,6 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
   /* ---- Header: the same minimal bar on every screen size ---- */
   .app-header { justify-content: space-between; align-items: center; gap: 24px; padding: 6px 4px 22px; }
   .brand { display: flex; align-items: center; gap: 9px; min-width: 0; }
-  .brand-mark { font-size: 20px; line-height: 1; }
   .brand-text { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 10px; min-width: 0; }
   .app-header-title { font-size: 18px; letter-spacing: -0.01em; }
   .brand-meta { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -1812,7 +1825,6 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
   @media (max-width: 780px) {
     .app-header { gap: 12px 12px; padding: 14px 2px 24px; }
     .brand { flex: 1 1 0; }
-    .brand-mark { font-size: 18px; }
     .app-header-title { font-size: 17px; }
     .app-header .user-chip { max-width: 110px; }
     .view-bar { margin-left: 0; }
@@ -1855,7 +1867,6 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
   @media (prefers-reduced-motion: reduce) { .shift-attention .add-btn { animation: none; } }
 
   .app-header-title { cursor: pointer; }
-  #brandMark { cursor: pointer; }
   .app-header-title:focus-visible { outline: 2px solid var(--sky); outline-offset: 3px; border-radius: 6px; }
 
 
@@ -2165,6 +2176,8 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
   .cal-list .log-row.today.live.live-done, .cal-list .log-row.today.live.live-done:hover { --live-fill: rgba(30, 142, 90, 0.3); box-shadow: 0 0 0 1.5px var(--good) inset; }
   body.dark-mode .cal-list .log-row.today.live.live-done, body.dark-mode .cal-list .log-row.today.live.live-done:hover { --live-fill: rgba(62, 208, 138, 0.34); }
   .cal-list .log-row.today.live .cal-st { color: var(--deep); }
+  /* ===== v3.11.1: removed the icon next to the page title in the header ===== */
+  /* ===== v3.11.0: loading screen with the animated logo ===== */
   /* ===== v3.10.0: installable app (PWA): manifest, icons, offline service worker, Install button in Settings ===== */
   /* ===== v3.9.0: calendar List view: today's row shows live shift progress ===== */
   /* ===== v3.8.0: six colour themes (Ocean, Forest, Sunset, Grape, Rose, Slate), each light and dark, chosen in Settings ===== */
@@ -2252,13 +2265,29 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
 </style>
 </head>
 <body>
-<div id="clkSplash" role="status" aria-live="polite"><div class="clk-splash-card"><span aria-hidden="true">☁️</span><b>Loading your data from the cloud…</b></div></div>
+<div id="clkSplash" role="status" aria-live="polite"><div class="clk-load">
+<svg class="clk-logo" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+  <defs><linearGradient id="clkG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--sky,#4FA8E8)"/><stop offset="1" style="stop-color:var(--sky-dark,#2D7FC4)"/></linearGradient></defs>
+  <rect width="100" height="100" rx="22" fill="url(#clkG)"/>
+  <rect x="20" y="22" width="60" height="48" rx="9" fill="#fff"/>
+  <rect x="24.5" y="26.5" width="51" height="39" rx="5.5" style="fill:var(--hero-a,#0B2A4A)"/>
+  <circle cx="50" cy="46" r="15.5" fill="none" stroke="#7CC4FF" stroke-width="3.4"/>
+  <g transform="rotate(-90 50 46)"><circle class="clk-arc" cx="50" cy="46" r="15.5" fill="none" stroke="#FFC93C" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="26 71.4"/></g>
+  <g class="clk-hr"><path d="M50 46l7 4" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></g>
+  <g class="clk-min"><path d="M50 46V35.5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></g>
+  <circle cx="50" cy="46" r="2" fill="#fff"/>
+  <rect x="44" y="70" width="12" height="6" fill="#fff"/>
+  <rect x="34" y="76" width="32" height="4.5" rx="2" fill="#fff"/>
+  <circle class="clk-led" cx="73" cy="67.8" r="1" fill="#FFC93C"/>
+</svg>
+<div class="clk-word">Clock me Out</div>
+<div class="clk-msg">Loading your data from the cloud<span class="clk-dots" aria-hidden="true"><i></i><i></i><i></i></span></div>
+</div></div>
 <header class="app-header">
   <div class="brand">
-    <span class="brand-mark" id="brandMark" aria-hidden="true">🖥️</span>
     <span class="brand-text">
       <span class="app-header-title" id="brandTitle" role="link" tabindex="0" title="Go to Shift Details">Clock me Out</span>
-      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.10.0</span></span>
+      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.11.1</span></span>
     </span>
   </div>
   <div class="view-bar" id="viewBar" data-view="overview">
@@ -6501,8 +6530,6 @@ body.dark-mode .clk-splash-card { background: #101E30; border-color: #2A3F55; }
   brandTitle.addEventListener('click', () => switchView('overview'));
 
   brandTitle.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchView('overview'); } });
-
-  document.getElementById('brandMark').addEventListener('click', () => switchView('overview'));
 
   document.getElementById('tabLog').addEventListener('click', () => switchView('log'));
 

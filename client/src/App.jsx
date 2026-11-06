@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import { api, API_BASE, tokenStore } from "./api.js";
 import Mascot from "./Mascot.jsx";
+import LoadingScreen from "./LoadingScreen.jsx";
 
 // The app's own data keys (same ones its Backup feature uses). Everything else stays per device.
 const KEYS = ["cmoLogEntries", "cmoLogEntryCount", "cmoShiftState", "cmoHolidays", "cmoAbsent", "cmoUserName"];
@@ -110,6 +111,8 @@ export default function App() {
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const dark = document.body.classList.contains("dark-mode");
+
+  if (phase === "loading") return <LoadingScreen />;
   // The mascot looks away shyly while a password is typed, and reacts to errors and loading.
   const mood = error ? "surprised" : phase === "loading" ? "delighted" : pwFocus ? "bashful" : null;
 

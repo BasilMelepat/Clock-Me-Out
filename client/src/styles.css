@@ -261,3 +261,23 @@ body.theme-rose { --deep: #471022; --sky: #DD4075; --sky-light: #FBEAEF; --ink: 
 body.theme-rose.dark-mode { --deep: #F9E6ED; --sky: #FB6A9A; --sky-light: #3D1A25; --ink: #F9E6ED; --muted: #C299A7; --line: #532C39; --card: #30121C; --sky-dark: #FA2E72; --page-a: #210D14; --page-b: #13060B; --shadow-rgb: 71, 16, 34; }
 body.theme-slate { --deep: #212A36; --sky: #546C8C; --sky-light: #EFF2F6; --ink: #212A36; --muted: #5C6470; --line: #E1E5EA; --card: #FFFFFF; --sky-dark: #3D4E66; --page-a: #13161B; --page-b: #0A0C0F; --shadow-rgb: 33, 42, 54; }
 body.theme-slate.dark-mode { --deep: #ECEFF3; --sky: #86A3CB; --sky-light: #252A32; --ink: #ECEFF3; --muted: #A5ACB5; --line: #383E47; --card: #1B2027; --sky-dark: #5B82B9; --page-a: #13161B; --page-b: #0A0C0F; --shadow-rgb: 33, 42, 54; }
+
+/* Loading screen (animated logo), same look as the app's startup screen */
+.clk-boot { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+.clk-load { display: grid; justify-items: center; gap: 14px; text-align: center; }
+.clk-logo { width: 96px; height: 96px; filter: drop-shadow(0 10px 22px rgba(var(--shadow-rgb, 11, 42, 74), 0.28)); animation: clkFloat 2.4s ease-in-out infinite; }
+.clk-word { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--deep, #0B2A4A); }
+.clk-msg { display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; color: var(--muted, #4A6580); }
+.clk-dots { display: inline-flex; gap: 3px; margin-left: 5px; }
+.clk-dots i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; animation: clkDot 1.2s ease-in-out infinite both; }
+.clk-dots i:nth-child(2) { animation-delay: 0.16s; } .clk-dots i:nth-child(3) { animation-delay: 0.32s; }
+.clk-arc, .clk-min, .clk-hr { transform-box: view-box; transform-origin: 50px 46px; }
+.clk-arc { animation: clkSpin 1.5s linear infinite; }
+.clk-min { animation: clkSpin 2.6s linear infinite; }
+.clk-hr { animation: clkSpin 30s linear infinite; }
+.clk-led { animation: clkBlink 1.2s ease-in-out infinite; }
+@keyframes clkSpin { to { transform: rotate(360deg); } }
+@keyframes clkFloat { 50% { transform: translateY(-5px); } }
+@keyframes clkDot { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+@keyframes clkBlink { 50% { opacity: 0.2; } }
+@media (prefers-reduced-motion: reduce) { .clk-logo, .clk-arc, .clk-min, .clk-hr, .clk-led, .clk-dots i { animation: none; } }
