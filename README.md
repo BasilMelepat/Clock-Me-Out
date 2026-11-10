@@ -6,7 +6,7 @@ React sign-in page · Express API · MongoDB.
 ```
 clock-me-out/
 ├── client/
-│   ├── public/app.html   the Clock me Out app (v3.11.1) with cloud sync and a "Sign out" row in Settings
+│   ├── public/app.html   the Clock me Out app (v3.12.0) with cloud sync and a "Sign out" row in Settings
 │   └── src/              sign-in page (Google or email) and the admin dashboard
 └── server/               Express API
 ```
@@ -28,7 +28,7 @@ Signing out is under **Settings → Cloud sync → Sign out**.
 5. Coming back to a tab picks up changes from other devices. If this device and the cloud both changed, nothing is overwritten and you choose Upload or Restore.
 6. In the Log tab the Table View can be sorted by Day, Clocked, Target or Log (tap a column title again to reverse). Hovering a day in the calendar highlights its table row, and hovering a row highlights its day in the calendar. In the calendar's List view, today's row fills with your live shift progress (like today's cell in the grid) and reads "In progress · 63%".
 7. **Clear Log** in the Table View removes every day shown for that month, after a warning popup. **Bulk Import** has two steps (upload a sheet, or paste entries) and its Import button stays disabled until there is something valid to import.
-8. Click a row in the Table View to edit that day. Deleting an entry, clearing the log, deleting a past month, or removing holidays and absences shows a toast with an **Undo** button (or press Ctrl/Cmd+Z) for a few seconds.
+8. Click a row in the Table View to edit that day. Deleting an entry, clearing the log, deleting a past month, or removing holidays and absences, clearing shift details or breaks, and clearing the running-late time or departure plan shows a toast with an **Undo** button (or press Ctrl/Cmd+Z) for a few seconds.
 9. **Settings → Profile** shows your Google photo, name and email with a Sign out button, and a field for the name used in your greetings. **Settings → Your data** keeps backups in one card: **Cloud** (sync, upload, restore from your account) and **Offline** (download or restore a backup file).
 10. **Settings → Preferences → Theme** has six colour themes (Ocean, Forest, Sunset, Grape, Rose, Slate), each with a light and a dark look, plus a Light/Dark switch. The choice is saved on this device and also colours the sign-in page and the admin dashboard.
 11. Main actions (starting or stopping a shift, adding breaks, logging days, holidays, backup, name) show a short toast message. In the admin dashboard, disabling, enabling, unlocking and deleting do too.
@@ -61,7 +61,7 @@ Open **https://clock-me-out.vercel.app/admin** and sign in with the admin email 
 | `PUT /api/state` | Replace the user's saved data |
 
 ## Versioning
-MAJOR.MINOR.PATCH, shown in the header badge (for example v3.11.1).
+MAJOR.MINOR.PATCH, shown in the header badge (for example v3.12.0).
 - **MAJOR:** a big redesign or a change that breaks saved data.
 - **MINOR:** a new feature.
 - **PATCH:** a fix or small tweak.

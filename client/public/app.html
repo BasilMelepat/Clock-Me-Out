@@ -2176,6 +2176,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   .cal-list .log-row.today.live.live-done, .cal-list .log-row.today.live.live-done:hover { --live-fill: rgba(30, 142, 90, 0.3); box-shadow: 0 0 0 1.5px var(--good) inset; }
   body.dark-mode .cal-list .log-row.today.live.live-done, body.dark-mode .cal-list .log-row.today.live.live-done:hover { --live-fill: rgba(62, 208, 138, 0.34); }
   .cal-list .log-row.today.live .cal-st { color: var(--deep); }
+  /* ===== v3.12.0: Undo for clearing shift details, breaks, running late time and the departure plan ===== */
   /* ===== v3.11.1: removed the icon next to the page title in the header ===== */
   /* ===== v3.11.0: loading screen with the animated logo ===== */
   /* ===== v3.10.0: installable app (PWA): manifest, icons, offline service worker, Install button in Settings ===== */
@@ -2287,7 +2288,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   <div class="brand">
     <span class="brand-text">
       <span class="app-header-title" id="brandTitle" role="link" tabindex="0" title="Go to Shift Details">Clock me Out</span>
-      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.11.1</span></span>
+      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.12.0</span></span>
     </span>
   </div>
   <div class="view-bar" id="viewBar" data-view="overview">
@@ -3157,11 +3158,23 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     breaksContainer.appendChild(div);
     div.classList.add('reveal');
     div.querySelector('[data-remove]').addEventListener('click', () => {
+      const position = [...breaksContainer.children].indexOf(div);
+      const was = { start: div.querySelector('.break-start').value, end: div.querySelector('.break-end').value };
       div.remove();
       renumber();
       updateClearBreaksVisibility();
       calculate();
       saveShiftState();
+      toast('Break removed', () => {
+        addBreak(was.start, was.end);
+        const rows = [...breaksContainer.children], added = rows[rows.length - 1], before = rows[position];
+        if (before && before !== added) breaksContainer.insertBefore(added, before); // back in its old place
+        renumber();
+        updateClearBreaksVisibility();
+        calculate();
+        saveShiftState();
+        toast('↩️ Break restored');
+      });
     });
     div.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => {
       updateBreakDuration(div);
@@ -3795,10 +3808,17 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
 
   document.getElementById('clearBreaksBtn').addEventListener('click', () => {
     const count = breaksContainer.querySelectorAll('.break-row').length;
-    if (count > 1 && !confirm(`Remove all ${count} breaks? This can't be undone.`)) {
+    if (count > 1 && !confirm(`Remove all ${count} breaks? You can undo this right after.`)) {
       return;
     }
-    toast(`🧹 Cleared ${count} break${count === 1 ? '' : 's'}`);
+    const savedBreaks = [...breaksContainer.querySelectorAll('.break-row')].map(r => ({ start: r.querySelector('.break-start').value, end: r.querySelector('.break-end').value }));
+    toast(`🧹 Cleared ${count} break${count === 1 ? '' : 's'}`, () => {
+      savedBreaks.forEach(b => addBreak(b.start, b.end));
+      updateClearBreaksVisibility();
+      calculate();
+      saveShiftState();
+      toast(`↩️ ${savedBreaks.length} break${savedBreaks.length === 1 ? '' : 's'} restored`);
+    });
     breaksContainer.innerHTML = '';
     breakCount = 0;
     updateClearBreaksVisibility();
@@ -3855,7 +3875,34 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     calculate();
     saveShiftStateNow();
   }
-  document.getElementById('closeShiftBtn').addEventListener('click', () => { clearShiftToday(); toast('Today\'s shift cleared'); });
+  // Undo for clearing shift details: remember the clock-in, breaks and ended state, and put them back on request
+  function snapshotShiftDetails() {
+    return {
+      clockIn: document.getElementById('clockIn').value,
+      breaks: [...breaksContainer.querySelectorAll('.break-row')].map(r => ({ start: r.querySelector('.break-start').value, end: r.querySelector('.break-end').value })),
+      anchor: shiftAnchor.getTime(),
+      ended: shiftEnded ? shiftEndedAt : null
+    };
+  }
+  function restoreShiftDetails(snap) {
+    shiftAnchor = new Date(snap.anchor);
+    setShiftOpen(true);
+    document.getElementById('clockIn').value = snap.clockIn;
+    breaksContainer.innerHTML = '';
+    breakCount = 0;
+    snap.breaks.forEach(b => addBreak(b.start, b.end));
+    updateClearBreaksVisibility();
+    if (snap.ended) setShiftEnded(true, snap.ended);
+    calculate();
+    saveShiftStateNow();
+  }
+
+  document.getElementById('closeShiftBtn').addEventListener('click', () => {
+    const snap = snapshotShiftDetails();
+    clearShiftToday();
+    if (snap.clockIn) toast('Today\'s shift cleared', () => { restoreShiftDetails(snap); toast('↩️ Shift details restored'); });
+    else toast('Today\'s shift cleared');
+  });
 
   // Stop shift: log the hours worked so far (elapsed minus breaks) into today's Daily Log entry and end the shift.
   // A second shift on the same day adds to that day's entry, like adding hours by hand.
@@ -3864,7 +3911,11 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     const elapsedMin = Math.max(0, (Date.now() - state.clockInDate.getTime()) / 60000);
     const workedSec = Math.floor(Math.max(0, elapsedMin - Math.min(state.totalBreakMin, elapsedMin)) * 60);
     if (workedSec < 60) {
-      if (confirm('Less than a minute has been worked, so there is nothing to log. Discard this shift?')) { clearShiftToday(); toast('Shift discarded'); }
+      if (confirm('Less than a minute has been worked, so there is nothing to log. Discard this shift?')) {
+      const snap = snapshotShiftDetails();
+      clearShiftToday();
+      toast('Shift discarded', () => { restoreShiftDetails(snap); toast('↩️ Shift restored'); });
+    }
       return;
     }
     const date = shiftDayISO();
@@ -4416,9 +4467,16 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   });
 
   document.getElementById('clearLateBtn').addEventListener('click', () => {
+    const was = document.getElementById('lateMinutes').value;
     document.getElementById('lateMinutes').value = '';
     setLateOpen(false);
     calculate();
+    if (was) toast('Running late time cleared', () => {
+      document.getElementById('lateMinutes').value = was;
+      setLateOpen(true);
+      calculate();
+      toast('↩️ Running late time restored');
+    });
   });
 
   document.getElementById('earlyTime').addEventListener('input', () => { calculateEarlyPlan(); updateClock(); });
@@ -4434,11 +4492,20 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   });
 
   clearEarlyBtn.addEventListener('click', () => {
+    const was = document.getElementById('earlyTime').value;
     document.getElementById('earlyTime').value = '';
     calculateEarlyPlan();
     clearEarlyBtn.style.display = 'none';
     earlyPlannerBody.style.display = 'none';
     addEarlyPlanBtn.style.display = 'block';
+    if (was) toast('Departure plan cleared', () => {
+      addEarlyPlanBtn.style.display = 'none';
+      clearEarlyBtn.style.display = 'inline-block';
+      earlyPlannerBody.style.display = 'block';
+      el.earlyTime.value = was;
+      calculateEarlyPlan();
+      toast('↩️ Departure plan restored');
+    });
   });
 
   // ========================================================================
