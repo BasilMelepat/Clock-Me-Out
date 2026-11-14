@@ -1,6 +1,6 @@
 {
   "name": "clock-me-out-server",
-  "version": "2.0.0",
+  "version": "3.12.1+1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,5 +15,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.6.0"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  }
 }

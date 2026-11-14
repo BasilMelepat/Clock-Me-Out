@@ -3,10 +3,10 @@
 <head>
 <script>
 /* ===== Cloud sync engine (added for the MERN version) =====
-   The app's six data keys are saved to the signed-in account in MongoDB through the API.
-   Changes upload a moment after they happen; coming back to the tab picks up changes from other devices.
-   If this device AND the cloud both changed, nothing is overwritten: the person chooses Upload or Restore in Settings.
-   The visible UI (header cloud button, Settings > Cloud sync) lives in the app script and talks to window.clkCloud. */
+   The cloud is the only source of truth. Every time the app opens it loads your data from the cloud first and replaces
+   whatever is on this device, so an old copy on a device is never trusted. The device copy is scratch space for the open page.
+   Every save names the cloud version it was based on, and the server refuses a save based on an old version, so a stale
+   device can never overwrite newer data. When two devices both changed something, the changes are merged, not replaced. */
 (function () {
   var KEYS = ['cmoLogEntries', 'cmoLogEntryCount', 'cmoShiftState', 'cmoHolidays', 'cmoAbsent', 'cmoUserName'];
   var LS = window.localStorage, SP = Storage.prototype;
@@ -20,159 +20,240 @@
     location.replace('/');
     return;
   }
+  try { _rem.call(LS, 'clk_synced'); } catch (e) {} // marker from older versions, no longer used
 
   // The shift state carries a savedAt timestamp that changes on every save; it must not count as a change.
   function strip(k, v) {
-    if (k === 'cmoShiftState') { try { var o = JSON.parse(v); if (o && typeof o === 'object') { delete o.savedAt; return JSON.stringify(o); } } catch (e) {} }
+    if (k === 'cmoShiftState' && typeof v === 'string') { try { var o = JSON.parse(v); if (o && typeof o === 'object') { delete o.savedAt; return JSON.stringify(o); } } catch (e) {} }
     return v;
   }
+  function same(k, a, b) { return strip(k, a) === strip(k, b); }
   function norm(o) { var a = []; KEYS.forEach(function (k) { if (o && typeof o[k] === 'string') a.push([k, strip(k, o[k])]); }); return JSON.stringify(a); }
   function snap() { var o = {}; KEYS.forEach(function (k) { var v = _get.call(LS, k); if (v !== null) o[k] = v; }); return o; }
   function read(key) { try { return JSON.parse(_get.call(LS, key) || 'null'); } catch (e) { return null; } }
-  function write(key, val) { try { _set.call(LS, key, JSON.stringify(val)); } catch (e) {} }
-  function dirty() { return norm(snap()) !== norm(read('clk_synced') || {}); }
+  function write(key, val) { try { if (val === null) _rem.call(LS, key); else _set.call(LS, key, JSON.stringify(val)); } catch (e) {} }
   function setLast() { try { _set.call(LS, 'clk_last', String(Date.now())); } catch (e) {} }
   function headers() { return { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }; }
   function emit(state, message, manual) {
     try { window.dispatchEvent(new CustomEvent('clk-sync', { detail: { state: state, message: message || '', manual: !!manual } })); } catch (e) {}
   }
 
+  var leaving = false;
   function leave(wipe) {
     leaving = true;
     try {
       _rem.call(LS, 'clk_token');
-      if (wipe) ['clk_synced', 'clk_pending', 'clk_last', 'clk_user', 'clk_uid'].concat(KEYS).forEach(function (k) { _rem.call(LS, k); });
+      if (wipe) ['clk_pending', 'clk_stash', 'clk_last', 'clk_user', 'clk_uid'].concat(KEYS).forEach(function (k) { _rem.call(LS, k); });
     } catch (e) {}
     location.replace('/');
   }
 
-  function request(method, body, keepalive) {
-    return fetch(api + '/state', { method: method, headers: headers(), body: body, keepalive: !!keepalive }).then(function (r) {
-      if (r.status === 401 || r.status === 403) { leave(false); throw new Error('Your session ended. Please sign in again.'); }
-      return r.json().catch(function () { return {}; }).then(function (j) {
-        if (!r.ok) throw new Error(j.error || ('Server error ' + r.status));
-        return j;
-      });
+  // ---------- merging two devices' changes ----------
+  function arr(v) { try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+  function eKey(e) { return e && e.date ? 'd:' + e.date : 'i:' + (e && e.id); }
+  function mapOf(list) { var m = {}; list.forEach(function (e) { m[eKey(e)] = e; }); return m; }
+  function jsonEq(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  // Log days are matched by date. Start from the cloud's days, then apply what changed on this device since it loaded the cloud copy.
+  function mergeEntries(base, local, remote) {
+    var b = mapOf(base), l = mapOf(local), out = mapOf(remote), k;
+    for (k in l) if (!(k in b) || !jsonEq(l[k], b[k])) out[k] = l[k];                       // added or edited here
+    for (k in b) if (!(k in l) && k in out && jsonEq(out[k], b[k])) delete out[k];          // deleted here, untouched elsewhere
+    var list = Object.keys(out).map(function (x) { return out[x]; });
+    list.sort(function (x, y) { return (x.date || '').localeCompare(y.date || '') || (x.id || 0) - (y.id || 0); });
+    var seen = {}, max = 0;
+    list.forEach(function (e) { if (e.id > max) max = e.id; });
+    list.forEach(function (e) { if (!e.id || seen[e.id]) e.id = ++max; seen[e.id] = 1; }); // ids stay unique
+    return list;
+  }
+  function mergeSets(base, local, remote) {
+    var b = new Set(base), l = new Set(local), out = new Set(remote);
+    local.forEach(function (x) { if (!b.has(x)) out.add(x); });
+    base.forEach(function (x) { if (!l.has(x)) out.delete(x); });
+    return Array.from(out).sort();
+  }
+  // preferRemote: for single values changed in both places, take the cloud's (used when recovering a set-aside copy)
+  function mergeState(base, local, remote, preferRemote) {
+    var out = {};
+    KEYS.forEach(function (k) {
+      var b = base[k], l = local[k], r = remote[k];
+      if (same(k, l, b)) { if (r !== undefined) out[k] = r; return; }   // not changed here: the cloud's value
+      if (same(k, r, b)) { if (l !== undefined) out[k] = l; return; }   // changed only here: ours
+      if (k === 'cmoLogEntries') out[k] = JSON.stringify(mergeEntries(arr(b), arr(l), arr(r)));
+      else if (k === 'cmoHolidays' || k === 'cmoAbsent') out[k] = JSON.stringify(mergeSets(arr(b), arr(l), arr(r)));
+      else if (preferRemote && r !== undefined) out[k] = r;
+      else if (l !== undefined) out[k] = l;
+      else if (r !== undefined) out[k] = r;
+    });
+    if (out.cmoLogEntries) { // the next new id must be above every id in use
+      var mx = 0; arr(out.cmoLogEntries).forEach(function (e) { if (e.id > mx) mx = e.id; });
+      out.cmoLogEntryCount = String(Math.max(mx, Number(out.cmoLogEntryCount) || 0));
+    }
+    return out;
+  }
+  // Does this device have days or holidays that the cloud copy lacks?
+  function richer(local, srv) {
+    var have = mapOf(arr(srv.cmoLogEntries)), list = arr(local.cmoLogEntries), i;
+    for (i = 0; i < list.length; i++) if (!(eKey(list[i]) in have)) return true;
+    var h = new Set(arr(srv.cmoHolidays).concat(arr(srv.cmoAbsent)));
+    return arr(local.cmoHolidays).concat(arr(local.cmoAbsent)).some(function (x) { return !h.has(x); });
+  }
+
+  // ---------- talking to the cloud ----------
+  var baseVer = 0, baseData = {}, ready = false, busy = false, timer = null;
+  function dirty() { return ready && norm(snap()) !== norm(baseData); }
+  function setLocal(data) { KEYS.forEach(function (k) { if (typeof data[k] === 'string') _set.call(LS, k, data[k]); else _rem.call(LS, k); }); }
+  function saved(data, ver) { baseVer = ver; baseData = data; write('clk_pending', null); setLast(); }
+  function reloadSoon() { try { if (window.clkBeforeApply) window.clkBeforeApply(); } catch (e) {} setTimeout(function () { location.reload(); }, 350); }
+
+  function request(method, path, body, keepalive, signal) {
+    return fetch(api + path, { method: method, headers: headers(), body: body ? JSON.stringify(body) : undefined, keepalive: !!keepalive, cache: 'no-store', signal: signal }).then(function (r) {
+      if (r.status === 401 || r.status === 403) { leave(false); throw new Error('session'); }
+      return r.json().catch(function () { return {}; }).then(function (j) { return { status: r.status, ok: r.ok, json: j }; });
     }, function () { throw new Error('Couldn\'t reach the server. Check your connection.'); });
   }
-
-  var busy = false, conflict = false, timer = null, leaving = false;
-
-  function schedule() {
-    clearTimeout(timer);
-    if (!dirty()) return; // e.g. only the savedAt timestamp changed
-    timer = setTimeout(function () { sync({}); }, 1200);
-  }
-
-  function finish(state, message, o) {
-    busy = false;
-    if (state === 'ok') { conflict = false; setLast(); }
-    emit(state, message, o.manual);
-    if (state === 'ok' && dirty()) schedule(); // something changed while syncing
-  }
-
-  // o.force: 'up' (this device wins) or 'down' (the cloud wins); otherwise a three-way choice against the last synced copy
-  function sync(o) {
-    o = o || {};
-    if (busy) return Promise.resolve();
-    if (conflict && !o.manual) return Promise.resolve(); // paused until the person chooses
-    busy = true;
-    emit('syncing', '', o.manual);
-    return request('GET').then(function (j) {
-      var srv = j.data, local = snap(), base = read('clk_synced') || {}, pend = read('clk_pending');
-      var localN = norm(local), baseN = norm(base), srvN = srv ? norm(srv) : null;
-
-      function up() {
-        write('clk_pending', local);
-        return request('PUT', JSON.stringify({ data: local })).then(function () {
-          write('clk_synced', local); write('clk_pending', null);
-          finish('ok', 'Synced to the cloud ✓', o);
-        });
-      }
-      function down() {
-        try { if (window.clkBeforeApply) window.clkBeforeApply(); } catch (e) {}
-        KEYS.forEach(function (k) { if (typeof srv[k] === 'string') _set.call(LS, k, srv[k]); else _rem.call(LS, k); });
-        write('clk_synced', srv); write('clk_pending', null);
-        finish('ok', 'Restored from the cloud ✓', o);
-        setTimeout(function () { location.reload(); }, 350);
-      }
-
-      if (o.force === 'up') return up();
-      if (o.force === 'down') {
-        if (!srv) throw new Error('There is nothing in the cloud to restore yet.');
-        return down();
-      }
-      if (!srv) { // nothing saved in the cloud yet
-        if (Object.keys(local).length) return up();
-        write('clk_synced', {});
-        return finish('ok', 'Already up to date ✓', o);
-      }
-      if (srvN === localN) { write('clk_synced', srv); return finish('ok', 'Already up to date ✓', o); }
-      var thisDeviceChanged = localN !== baseN;
-      var cloudIsOurs = srvN === baseN || (pend && srvN === norm(pend)); // the cloud still holds what we last synced
-      if (!thisDeviceChanged) return down(); // only the cloud changed
-      if (cloudIsOurs) return up();          // only this device changed
-      conflict = true; busy = false;         // both changed: don't overwrite anything
-      emit('conflict', '', o.manual);
-    }).catch(function (e) {
-      busy = false;
-      emit('err', e.message, o.manual);
+  function fail(res) { return new Error((res.json && res.json.error) || ('Server error ' + res.status)); }
+  function put(data, ver, force) {
+    return request('PUT', '/state', { data: data, baseVersion: ver, force: !!force }).then(function (r) {
+      if (r.status === 409) return { conflict: true };
+      if (!r.ok) throw fail(r);
+      return { version: r.json.version };
     });
   }
 
-  // Last-chance save when the page is hidden or closed.
+  function schedule() { clearTimeout(timer); if (!dirty()) return; timer = setTimeout(function () { sync({}); }, 1200); }
+
+  // o.force: 'up' (replace the cloud with this device) or 'down' (replace this device with the cloud). Otherwise: sync safely.
+  function sync(o) {
+    o = o || {};
+    if (!ready || busy) return Promise.resolve();
+    busy = true;
+    emit('syncing', '', o.manual);
+    var attempts = 0;
+    function finish(msg) { busy = false; emit('ok', msg, o.manual); }
+    function adopt(data, ver, msg) { setLocal(data); saved(data, ver); finish(msg); reloadSoon(); } // take this copy and reload onto it
+    function again() { if (++attempts > 3) throw new Error('The cloud changed while saving. Try again in a moment.'); return once(); }
+    function once() {
+      return request('GET', '/state').then(function (res) {
+        if (!res.ok) throw fail(res);
+        var srv = res.json.data || {}, ver = res.json.version || 0, local = snap(), changed = norm(local) !== norm(baseData);
+        if (o.force === 'down') {
+          if (!res.json.data) throw new Error('There is nothing in the cloud to restore yet.');
+          return adopt(srv, ver, 'Restored from the cloud ✓');
+        }
+        if (o.force === 'up') return put(local, ver, true).then(function (r) { saved(local, r.version); finish('Uploaded to the cloud ✓'); });
+        if (norm(srv) === norm(local)) { saved(srv, ver); return finish('Already up to date ✓'); }
+        if (ver === baseVer) { // the cloud is unchanged since this page loaded it
+          if (!changed) return finish('Already up to date ✓');
+          return put(local, ver).then(function (r) {
+            if (r.conflict) return again();
+            saved(local, r.version); finish('Synced to the cloud ✓');
+            if (norm(snap()) !== norm(local)) schedule();
+          });
+        }
+        if (!changed) return adopt(srv, ver, 'Updated from the cloud ✓'); // another device saved and nothing here needs keeping
+        var merged = mergeState(baseData, local, srv); // both changed: combine them
+        return put(merged, ver).then(function (r) {
+          if (r.conflict) return again();
+          if (norm(merged) === norm(local)) { saved(merged, r.version); return finish('Synced to the cloud ✓'); }
+          adopt(merged, r.version, 'Merged with changes from another device ✓');
+        });
+      });
+    }
+    return once().catch(function (e) { busy = false; if (e.message !== 'session') emit('err', e.message, o.manual); });
+  }
+
+  // Last-chance save when the page is hidden or closed. It still names its base version, so it cannot overwrite newer data.
+  // The unsaved copy is kept until the cloud confirms, and is merged in at the next start if this attempt did not get through.
   function flush() {
     clearTimeout(timer); timer = null;
-    if (conflict || !dirty()) return;
-    var s = snap(), body = JSON.stringify({ data: s });
-    write('clk_pending', s);
+    if (!dirty()) return;
+    var s = snap(), body = JSON.stringify({ data: s, baseVersion: baseVer });
+    write('clk_pending', { baseVer: baseVer, baseData: baseData, data: s, at: Date.now() });
     try { fetch(api + '/state', { method: 'PUT', headers: headers(), body: body, keepalive: body.length < 60000 }).catch(function () {}); } catch (e) {}
   }
 
   SP.setItem = function (k) { _set.apply(this, arguments); if (this === LS && KEYS.indexOf(String(k)) > -1) schedule(); };
   SP.removeItem = function (k) { _rem.apply(this, arguments); if (this === LS && KEYS.indexOf(String(k)) > -1) schedule(); };
   SP.clear = function () { _clr.apply(this, arguments); if (this === LS) schedule(); };
-
   window.addEventListener('pagehide', flush);
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') flush(); else sync({}); });
   window.addEventListener('focus', function () { sync({}); });
 
-  // Cloud first: the saved data is loaded from the account BEFORE the app starts, so it never opens on a stale device copy.
-  // (Edits on this device that haven't uploaded yet are kept; the sync below uploads them or flags a conflict.)
-  (function cloudFirst() {
-    var note = '', ctl = window.AbortController ? new AbortController() : null;
-    var cut = setTimeout(function () { if (ctl) ctl.abort(); }, 8000);
+  // ---------- start-up: cloud first, strictly ----------
+  (function startUp() {
+    var ctl = window.AbortController ? new AbortController() : null;
+    var cut = setTimeout(function () { if (ctl) ctl.abort(); }, 10000), note = '';
     fetch(api + '/auth/me', { headers: headers(), cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       if (j && j.user) write('clk_user', { name: j.user.name, email: j.user.email, picture: j.user.picture });
     }).catch(function () {});
-    fetch(api + '/state', { headers: headers(), cache: 'no-store', signal: ctl ? ctl.signal : undefined }).then(function (r) {
-      if (r.status === 401 || r.status === 403) { leave(false); throw new Error('session'); }
-      if (!r.ok) throw new Error('Server error ' + r.status);
-      return r.json();
-    }).then(function (j) {
-      var srv = j.data;
-      if (srv && !dirty()) {
-        KEYS.forEach(function (k) { if (typeof srv[k] === 'string') _set.call(LS, k, srv[k]); else _rem.call(LS, k); });
-        write('clk_synced', srv); setLast();
-      }
-    }).catch(function (e) {
-      if (e.message !== 'session') note = 'Couldn\'t reach the cloud, so this is the last copy saved on this device.';
-    }).then(function () {
+    request('GET', '/state', null, false, ctl ? ctl.signal : undefined).then(function (res) {
       clearTimeout(cut);
-      window.clkLoadNote = note;
-      if (!leaving && window.clkStartApp) window.clkStartApp();
-      setTimeout(function () { sync({}); }, 1500);
+      if (!res.ok) throw fail(res);
+      var srv = res.json.data || {}, ver = res.json.version || 0, local = snap(), pend = read('clk_pending');
+      if (pend && pend.data) { // changes from an earlier visit that never got confirmed: merge them into the cloud copy
+        var merged = mergeState(pend.baseData || {}, pend.data, srv);
+        setLocal(merged); baseVer = ver; baseData = srv;
+        if (norm(merged) === norm(srv)) { saved(srv, ver); return; }
+        return put(merged, ver).then(function (r) {
+          if (r.conflict) throw new Error('The cloud changed while loading. Please try again.');
+          saved(merged, r.version);
+        });
+      }
+      if (!res.json.data && Object.keys(local).length) { // brand-new cloud account, data already on this device: upload it
+        baseVer = ver; baseData = {};
+        return put(local, ver).then(function (r) { if (r.conflict) throw new Error('The cloud changed while loading. Please try again.'); saved(local, r.version); });
+      }
+      if (richer(local, srv)) { // never silently throw away days that only this device has
+        write('clk_stash', { at: Date.now(), data: local });
+        note = 'This device had days the cloud did not have, so they were set aside, not deleted. Open Settings, Your data, Recover to add them back.';
+      }
+      setLocal(srv); saved(srv, ver);
+    }).then(function () {
+      if (leaving) return;
+      ready = true; window.clkLoadNote = note;
+      if (window.clkStartApp) window.clkStartApp();
+    }).catch(function (e) {
+      clearTimeout(cut);
+      if (leaving || e.message === 'session') return;
+      var msg = e.message || 'Something went wrong';
+      if (window.clkLoadFail) window.clkLoadFail('Could not load your data. ' + msg);
     });
   })();
 
   var user = read('clk_user') || {};
   window.clkCloud = {
     email: user.email || '',
-    state: function () { return { dirty: dirty(), conflict: conflict, busy: busy, lastSyncAt: Number(_get.call(LS, 'clk_last')) || 0 }; },
+    state: function () { return { dirty: dirty(), conflict: false, busy: busy, lastSyncAt: Number(_get.call(LS, 'clk_last')) || 0 }; },
     sync: function (o) { return sync(o || { manual: true }); },
-    signOut: function () {
-      var go = function () { leave(true); };
-      if (dirty() && !conflict) sync({ manual: true }).then(go, go); else go();
+    signOut: function () { // never sign out while changes here are still unsaved
+      sync({ manual: true }).then(function () {
+        if (dirty()) { emit('err', 'Your latest changes could not be saved, so you were not signed out.', true); return; }
+        leave(true);
+      });
+    },
+    stash: function () { var s = read('clk_stash'); return s && s.data ? { at: s.at, days: arr(s.data.cmoLogEntries).length } : null; },
+    dismissStash: function () { _rem.call(LS, 'clk_stash'); },
+    // Add the set-aside days back to the cloud copy (a merge: nothing already in the cloud is removed)
+    recoverStash: function () {
+      var s = read('clk_stash');
+      if (!s || !s.data) return Promise.reject(new Error('Nothing to recover.'));
+      return request('GET', '/state').then(function (res) {
+        if (!res.ok) throw fail(res);
+        var merged = mergeState({}, s.data, res.json.data || {}, true);
+        return put(merged, res.json.version || 0).then(function (r) {
+          if (r.conflict) throw new Error('The cloud changed. Please try again.');
+          _rem.call(LS, 'clk_stash'); setLocal(merged); saved(merged, r.version);
+          emit('ok', 'Added back to the cloud ✓', true); reloadSoon();
+        });
+      });
+    },
+    history: function () { return request('GET', '/state/history').then(function (r) { if (!r.ok) throw fail(r); return r.json.items || []; }); },
+    restoreVersion: function (id) {
+      return request('POST', '/state/restore', { id: id }).then(function (r) {
+        if (!r.ok) throw fail(r);
+        setLocal(r.json.data || {}); saved(r.json.data || {}, r.json.version);
+        emit('ok', 'Version restored ✓', true); reloadSoon();
+      });
     }
   };
 })();
@@ -193,7 +274,21 @@ window.clkStartApp = function () {
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
 };
-setTimeout(function () { window.clkStartApp(); }, 12000); // safety net: never leave the app stuck on the loading screen
+// The app never opens on an old copy from this device: if the cloud can't be reached, say so and offer Retry.
+window.clkLoadFail = function (message) {
+  var show = function () {
+    var splash = document.getElementById('clkSplash');
+    if (!splash) return;
+    splash.classList.add('failed');
+    var msg = splash.querySelector('.clk-msg');
+    msg.textContent = message;
+    var retry = document.createElement('button');
+    retry.type = 'button'; retry.className = 'clk-retry'; retry.textContent = 'Try again';
+    retry.onclick = function () { location.reload(); };
+    msg.parentNode.appendChild(retry);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', show); else show();
+};
 if (window.clkPreview) setTimeout(function () { window.clkStartApp(); }, window.clkPreviewDelay || 0);
 // Installable app: keep the browser's install prompt for the Settings button, and register the offline service worker
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.clkInstallEvent = e; window.dispatchEvent(new Event('clk-install-ready')); });
@@ -204,6 +299,9 @@ if ('serviceWorker' in navigator && !window.clkPreview) window.addEventListener(
 #clkSplash { position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; background: linear-gradient(160deg, var(--sky-light, #EAF4FC) 0%, var(--card, #FFFFFF) 55%); font-family: 'Inter', system-ui, sans-serif; transition: opacity 0.28s ease; }
 body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0B1622) 0%, var(--page-b, #060D16) 55%); }
 #clkSplash.done { opacity: 0; pointer-events: none; }
+#clkSplash.failed .clk-arc, #clkSplash.failed .clk-dots i, #clkSplash.failed .clk-min, #clkSplash.failed .clk-led { animation: none; }
+#clkSplash.failed .clk-msg { max-width: 320px; flex-wrap: wrap; justify-content: center; line-height: 1.4; }
+.clk-retry { margin-top: 4px; padding: 9px 20px; border: 0; border-radius: 10px; background: var(--sky, #4FA8E8); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
 
 .clk-load { display: grid; justify-items: center; gap: 14px; text-align: center; }
 .clk-logo { width: 96px; height: 96px; filter: drop-shadow(0 10px 22px rgba(var(--shadow-rgb, 11, 42, 74), 0.28)); animation: clkFloat 2.4s ease-in-out infinite; }
@@ -2165,6 +2263,11 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   @media (prefers-reduced-motion: reduce) { .log-row.link-hl, .calendar-cell.link-hl:not(.empty) { transform: none; } }
 
 
+
+  /* ===== v3.13.0: Recover (set-aside days, version history) ===== */
+  #stashRow[hidden], #historyList[hidden] { display: none; }
+  .hist-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; max-height: 240px; overflow: auto; }
+  .hist-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; }
   /* ===== v3.10.0: installable app ===== */
   #installBlock[hidden], #installBtn[hidden] { display: none; }
   /* ===== v3.9.0: today's row in the calendar's List view shows live shift progress ===== */
@@ -2176,6 +2279,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   .cal-list .log-row.today.live.live-done, .cal-list .log-row.today.live.live-done:hover { --live-fill: rgba(30, 142, 90, 0.3); box-shadow: 0 0 0 1.5px var(--good) inset; }
   body.dark-mode .cal-list .log-row.today.live.live-done, body.dark-mode .cal-list .log-row.today.live.live-done:hover { --live-fill: rgba(62, 208, 138, 0.34); }
   .cal-list .log-row.today.live .cal-st { color: var(--deep); }
+  /* ===== v3.12.1: sync fix: the cloud is the only source of truth. Versioned saves (a stale device can never overwrite newer data), merging, set-aside copies, version history ===== */
   /* ===== v3.12.0: Undo for clearing shift details, breaks, running late time and the departure plan ===== */
   /* ===== v3.11.1: removed the icon next to the page title in the header ===== */
   /* ===== v3.11.0: loading screen with the animated logo ===== */
@@ -2288,7 +2392,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   <div class="brand">
     <span class="brand-text">
       <span class="app-header-title" id="brandTitle" role="link" tabindex="0" title="Go to Shift Details">Clock me Out</span>
-      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.12.0</span></span>
+      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.12.1</span></span>
     </span>
   </div>
   <div class="view-bar" id="viewBar" data-view="overview">
@@ -2760,7 +2864,22 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
       </div>
       <p class="me-hint" id="backupHint">Saves your logs, shift, holidays, absences and name to a file. Restoring replaces everything currently saved.</p>
     </div>
-<div class="settings-block settings-reset">
+<div class="settings-block" id="recoverBlock">
+      <label>🛟 Recover <small>if something went missing</small></label>
+      <div id="stashRow" hidden>
+        <p class="me-hint" id="stashText"></p>
+        <div class="settings-row">
+          <button class="me-link-btn" id="stashAddBtn" type="button">➕ Add them back</button>
+          <button class="me-link-btn" id="stashDismissBtn" type="button">Dismiss</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <button class="me-link-btn" id="historyBtn" type="button">🕘 Version history</button>
+      </div>
+      <ul class="hist-list" id="historyList" hidden></ul>
+      <p class="me-hint">The cloud keeps your recent saved versions, so a mistake can be undone.</p>
+    </div>
+    <div class="settings-block settings-reset">
       <label>🧹 Reset</label>
       <div class="settings-row">
         <button class="me-danger-btn" id="meResetBtn" type="button">🚽 Flush Everything</button>
@@ -6244,6 +6363,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
 
   function refreshCloudUI() {
     renderAccount();
+    refreshRecoverUi();
     const st = cloud.state();
     const dirty = st.dirty;
     cloudBtn.classList.remove('off');
@@ -6259,20 +6379,58 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     cloudHint.style.color = st.conflict ? '#C0392B' : '';
     cloudHint.textContent = st.conflict
       ? CONFLICT_TEXT
-      : `Signed in${cloud.email ? ' as ' + cloud.email : ''}, ${when}. Changes are saved to your account automatically.${dirty ? ' This device has changes the cloud doesn\'t have yet.' : ''} Upload overwrites the cloud copy; Restore replaces this device\'s data with it.`;
+      : `Signed in${cloud.email ? ' as ' + cloud.email : ''}, ${when}. Your data is loaded from the cloud every time the app opens, and changes save automatically.${dirty ? ' This device has changes that are not saved yet.' : ''} Upload replaces the cloud copy with this device\'s (the old one stays in Version history); Restore replaces this device with the cloud copy.`;
   }
 
   cloudBtn.addEventListener('click', () => cloud.sync({ manual: true }));
   document.getElementById('cloudSyncBtn').addEventListener('click', () => cloud.sync({ manual: true }));
   document.getElementById('cloudUpBtn').addEventListener('click', () => {
-    if (confirm('Overwrite the cloud copy with this device\'s data?')) cloud.sync({ force: 'up', manual: true });
+    if (confirm('Replace the cloud copy with this device\'s data? The current cloud copy stays in Version history.')) cloud.sync({ force: 'up', manual: true });
   });
   document.getElementById('cloudDownBtn').addEventListener('click', () => {
     if (confirm('Replace everything on this device with the cloud copy?')) cloud.sync({ force: 'down', manual: true });
   });
   document.getElementById('signOutBtn').addEventListener('click', () => {
-    if (cloud.state().conflict && !confirm('This device and the cloud both have changes that were never merged. Signing out removes this device\'s copy. Sign out anyway?')) return;
-    cloud.signOut();
+    cloud.signOut(); // saves first, and stays signed in if the changes could not be saved
+  });
+
+  // Recover: days this device had that the cloud lost, and the cloud's version history
+  const stashRow = document.getElementById('stashRow'), stashText = document.getElementById('stashText');
+  const historyBtn = document.getElementById('historyBtn'), historyList = document.getElementById('historyList');
+  function refreshRecoverUi() {
+    const st = cloud.stash ? cloud.stash() : null;
+    stashRow.hidden = !st;
+    if (st) stashText.textContent = `This device had ${st.days} logged day${st.days === 1 ? '' : 's'} that the cloud copy did not have (set aside ${new Date(st.at).toLocaleString()}). They were not deleted.`;
+  }
+  document.getElementById('stashAddBtn').addEventListener('click', () => {
+    cloud.recoverStash().catch(e => toast(e.message));
+  });
+  document.getElementById('stashDismissBtn').addEventListener('click', () => {
+    if (!confirm('Delete the set-aside days for good?')) return;
+    cloud.dismissStash();
+    refreshRecoverUi();
+  });
+  historyBtn.addEventListener('click', async () => {
+    if (!historyList.hidden) { historyList.hidden = true; return; }
+    historyList.innerHTML = '<li>Loading…</li>';
+    historyList.hidden = false;
+    try {
+      const items = await cloud.history();
+      historyList.innerHTML = '';
+      if (!items.length) { historyList.innerHTML = '<li>No earlier versions yet.</li>'; return; }
+      items.forEach(it => {
+        const li = document.createElement('li');
+        const label = document.createElement('span');
+        label.textContent = `${new Date(it.savedAt).toLocaleString()} · ${it.days} day${it.days === 1 ? '' : 's'}`;
+        const btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'me-link-btn'; btn.textContent = 'Restore';
+        btn.addEventListener('click', () => {
+          if (confirm('Replace your current data with this version? Your current data is kept in the history too.')) cloud.restoreVersion(it.id).catch(e => toast(e.message));
+        });
+        li.append(label, btn);
+        historyList.appendChild(li);
+      });
+    } catch (e) { historyList.innerHTML = ''; historyList.hidden = true; toast(e.message); }
   });
 
   setInterval(refreshCloudUI, 5000);

@@ -7,23 +7,7 @@ import LoadingScreen from "./LoadingScreen.jsx";
 // The app's own data keys (same ones its Backup feature uses). Everything else stays per device.
 const KEYS = ["cmoLogEntries", "cmoLogEntryCount", "cmoShiftState", "cmoHolidays", "cmoAbsent", "cmoUserName"];
 
-// The shift state has a savedAt timestamp that changes on every save; it doesn't count as a change.
-const strip = (k, v) => {
-  if (k !== "cmoShiftState") return v;
-  try { const o = JSON.parse(v); if (o && typeof o === "object") { delete o.savedAt; return JSON.stringify(o); } } catch { /* keep as is */ }
-  return v;
-};
-const norm = (o) => JSON.stringify(KEYS.filter((k) => o && typeof o[k] === "string").map((k) => [k, strip(k, o[k])]));
-const snapshot = () => Object.fromEntries(KEYS.map((k) => [k, localStorage.getItem(k)]).filter(([, v]) => v !== null));
-const readJSON = (k) => { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch { return null; } };
 const writeJSON = (k, v) => localStorage.setItem(k, JSON.stringify(v));
-
-function applyServer(data) {
-  KEYS.forEach((k) => (typeof data[k] === "string" ? localStorage.setItem(k, data[k]) : localStorage.removeItem(k)));
-  writeJSON("clk_synced", data);
-  localStorage.setItem("clk_last", String(Date.now()));
-  localStorage.removeItem("clk_pending");
-}
 
 export default function App() {
   const [phase, setPhase] = useState(tokenStore.get() ? "loading" : "login");
@@ -34,38 +18,25 @@ export default function App() {
   const [pwFocus, setPwFocus] = useState(false);
   const started = useRef(false);
 
-  // Download this account's data, then open the app.
+  // Check the session and open the app. The sign-in page never reads or uploads your data: the app itself loads it from the
+  // cloud every time it opens, and an old copy left on this device is never used.
   const enter = useCallback(async () => {
     setPhase("loading");
     setError("");
     try {
-      const [{ user }, { data }] = await Promise.all([api.get("/auth/me"), api.get("/state")]);
-      const sameAccount = localStorage.getItem("clk_uid") === user.id;
-      const local = snapshot();
-      const unsynced = sameAccount && norm(local) !== norm(readJSON("clk_synced") || {});
-
-      if (unsynced) {
-        // This device has changes that never reached the server (for example after an expired session): keep them.
-        await api.put("/state", { data: local });
-        writeJSON("clk_synced", local);
-      } else if (data) {
-        applyServer(data);
-      } else {
-        // Brand-new account: start from whatever is on this device (usually nothing).
-        const seed = sameAccount || !Object.keys(local).length ? local : {};
-        if (!sameAccount) KEYS.forEach((k) => localStorage.removeItem(k));
-        if (Object.keys(seed).length) await api.put("/state", { data: seed });
-        writeJSON("clk_synced", seed);
+      const { user } = await api.get("/auth/me");
+      const previous = localStorage.getItem("clk_uid");
+      if (previous && previous !== user.id) {
+        // a different account on this browser must never see the last account's data
+        [...KEYS, "clk_pending", "clk_stash", "clk_last"].forEach((k) => localStorage.removeItem(k));
       }
-      localStorage.setItem("clk_last", String(Date.now()));
       localStorage.setItem("clk_uid", user.id);
       writeJSON("clk_user", { name: user.name, email: user.email, picture: user.picture });
       localStorage.setItem("clk_api", API_BASE);
       window.location.replace("/app.html");
     } catch (e) {
       if (!tokenStore.get()) { setError(e.message); return setPhase("login"); } // session expired, or the account was disabled
-      if (e.network && localStorage.getItem("clk_api")) return window.location.replace("/app.html"); // offline: use what's on this device
-      setError(e.message);
+      setError(e.network ? "Can't reach the server. Check your connection and try again." : e.message);
       setPhase("error");
     }
   }, []);

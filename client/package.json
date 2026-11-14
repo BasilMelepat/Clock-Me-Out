@@ -1,12 +1,15 @@
 {
   "name": "clock-me-out-client",
   "private": true,
-  "version": "1.0.0",
+  "version": "3.12.1+1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "stamp": "node scripts/stamp-version.mjs",
+    "predev": "npm run stamp",
+    "prebuild": "npm run stamp"
   },
   "dependencies": {
     "@react-oauth/google": "^0.12.1",

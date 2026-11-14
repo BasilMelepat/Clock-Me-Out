@@ -6,7 +6,7 @@ React sign-in page · Express API · MongoDB.
 ```
 clock-me-out/
 ├── client/
-│   ├── public/app.html   the Clock me Out app (v3.12.0) with cloud sync and a "Sign out" row in Settings
+│   ├── public/app.html   the Clock me Out app (v3.12.1) with cloud sync and a "Sign out" row in Settings
 │   └── src/              sign-in page (Google or email) and the admin dashboard
 └── server/               Express API
 ```
@@ -22,10 +22,10 @@ Signing out is under **Settings → Cloud sync → Sign out**.
 
 ## How it works
 1. The sign-in page has **Sign in / Sign up** tabs: email + password, or Google. After signing in it loads your saved data and opens the app.
-2. Every time the app opens it loads your data from the cloud first (a short loading screen with the animated logo), never from this device's saved copy. If the cloud can't be reached within 8 seconds it opens the last copy saved on this device and tells you. Changes made on this device that haven't uploaded yet are kept, not overwritten.
-3. A sync engine saves the app's six data keys (logs, shift, holidays, absences, name) to your account a moment after every change, and when you leave the page.
-4. The header **cloud button** and **Settings → Cloud sync** show the status: tap to sync now, **Upload** to overwrite the cloud copy with this device, **Restore** to replace this device with the cloud copy.
-5. Coming back to a tab picks up changes from other devices. If this device and the cloud both changed, nothing is overwritten and you choose Upload or Restore.
+2. **The cloud is the only source of truth.** Every time the app opens it loads your data from the cloud first (a short loading screen with the animated logo) and replaces whatever is on this device; an old copy on a device is never trusted. If the cloud can't be reached the app does not open on old data: it shows "Could not load your data" with **Try again**.
+3. Changes save to your account a moment after they happen, and when you leave the page. Every save states which cloud version it was based on; the server refuses a save based on an old version, so a stale device can never overwrite newer data.
+4. If two devices changed things, the changes are merged (days are matched by date; nothing from either side is dropped). If this device has days the cloud lacks when the app opens, they are set aside, not deleted.
+5. **Settings → Your data → Recover** adds set-aside days back, and lists the cloud's recent saved versions with **Restore**. The header **cloud button** and **Settings → Cloud** show sync status: **Sync now**, **Upload** (replaces the cloud copy; the old one stays in version history), **Restore** (replaces this device with the cloud copy).
 6. In the Log tab the Table View can be sorted by Day, Clocked, Target or Log (tap a column title again to reverse). Hovering a day in the calendar highlights its table row, and hovering a row highlights its day in the calendar. In the calendar's List view, today's row fills with your live shift progress (like today's cell in the grid) and reads "In progress · 63%".
 7. **Clear Log** in the Table View removes every day shown for that month, after a warning popup. **Bulk Import** has two steps (upload a sheet, or paste entries) and its Import button stays disabled until there is something valid to import.
 8. Click a row in the Table View to edit that day. Deleting an entry, clearing the log, deleting a past month, or removing holidays and absences, clearing shift details or breaks, and clearing the running-late time or departure plan shows a toast with an **Undo** button (or press Ctrl/Cmd+Z) for a few seconds.
@@ -61,12 +61,12 @@ Open **https://clock-me-out.vercel.app/admin** and sign in with the admin email 
 | `PUT /api/state` | Replace the user's saved data |
 
 ## Versioning
-MAJOR.MINOR.PATCH, shown in the header badge (for example v3.12.0).
+MAJOR.MINOR.PATCH+BUILD, kept in `client/package.json` and `server/package.json`. The header badge and `client/public/sw.js` are stamped from `client/package.json` by `npm run build` (script `client/scripts/stamp-version.mjs`). Badge shown (for example v3.12.1).
 - **MAJOR:** a big redesign or a change that breaks saved data.
 - **MINOR:** a new feature.
 - **PATCH:** a fix or small tweak.
 
-Every release changes the number, including admin-only and server changes. To release, change the number in the badge (`id="versionBadge"` in `client/public/app.html`) and `VERSION` in `client/public/sw.js`, so installed copies refresh their offline files.
+Every release changes the number, including admin-only and server changes. To release, bump `version` in both `package.json` files.
 
 ## Credits
 The mascot is based on [page-mascot](https://github.com/nilbuild/page-mascot) (MIT License, © Kamran Ahmed). Its sprite sheets are in `client/public/mascot-*.webp`.
