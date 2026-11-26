@@ -1,7 +1,7 @@
 {
   "name": "clock-me-out-client",
   "private": true,
-  "version": "3.12.12+12",
+  "version": "3.12.23+23",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -6,7 +6,7 @@ React sign-in page · Express API · MongoDB.
 ```
 clock-me-out/
 ├── client/
-│   ├── public/app.html   the Clock me Out app (v3.12.12) with cloud sync and a "Sign out" row in Settings
+│   ├── public/app.html   the Clock me Out app (v3.12.23) with cloud sync and a "Sign out" row in Settings
 │   └── src/              sign-in page (Google or email) and the admin dashboard
 └── server/               Express API
 ```
@@ -28,36 +28,36 @@ Signing out is under **Settings → Cloud sync → Sign out**.
 5. **Settings → Your data → Recover** adds set-aside days back, and lists the cloud's recent saved versions with **Restore**. The header **cloud button** and **Settings → Cloud** show sync status: **Sync now**, **Upload** (replaces the cloud copy; the old one stays in version history), **Restore** (replaces this device with the cloud copy).
 6. In the Log tab the Table View can be sorted by Day, Clocked, Target or Log (tap a column title again to reverse). Hovering a day in the calendar highlights its table row, and hovering a row highlights its day in the calendar. In the calendar's List view, today's row fills with your live shift progress (like today's cell in the grid) and reads "In progress · 63%".
 7. **Clear Log** in the Table View removes every day shown for that month, after a warning popup. **Bulk Import** has two steps (upload a sheet, or paste entries) and its Import button stays disabled until there is something valid to import.
-8. Click a row in the Table View to edit that day. Deleting an entry, clearing the log, deleting a past month, or removing holidays and absences, clearing shift details or breaks, and clearing the running-late time or departure plan shows a toast with an **Undo** button (or press Ctrl/Cmd+Z) for a few seconds.
+8. Click a row in the Table View to edit that day. Deleting an entry, clearing the log, deleting a past month, or removing holidays and leave, clearing shift details or breaks, and clearing the running-late time or departure plan shows a toast with an **Undo** button (or press Ctrl/Cmd+Z) for a few seconds.
 9. **Settings → Profile** shows your Google photo, name and email with a Sign out button, and a field for the name used in your greetings. **Settings → Your data** keeps backups in one card: **Cloud** (sync, upload, restore from your account) and **Offline** (download or restore a backup file).
 10. **Settings → Preferences → Theme** has six colour themes (Ocean, Forest, Sunset, Grape, Rose, Slate), each with a light and a dark look, plus a Light/Dark switch. The choice is saved on this device and also colours the sign-in page and the admin dashboard.
 11. Main actions (starting or stopping a shift, adding breaks, logging days, holidays, backup, name) show a short toast message. In the admin dashboard, disabling, enabling, unlocking and deleting do too.
 12. Theme, pointer effects and sound stay per device.
 
 ## Overview tab and salary deduction
-The Overview tab shows the month summary tiles, then **Month Goal**, **Salary Deduction** and **Past Months** side by side (desktop and tablet; they stack on phones, and Past Months only appears once earlier months have logs). Everything follows the month picked at the top.
+The Overview tab shows the month summary tiles, then **Month Goal**, **Salary Deduction** and **Past Months** side by side on desktop (on tablet Salary Deduction moves to its own row below the other two; on phones they stack, and Past Months only appears once earlier months have logs). Everything follows the month picked at the top.
 
-**Marking days.** **Edit** (on Month Goal or Salary Deduction) opens *Holidays, leave & absences*. Each day carries one mark:
+**Marking days.** **Edit** (on the Holidays or Leave row of Month Goal) opens *Holidays & leave*. Each day carries one mark:
 
 | Mark | Counts as |
 |---|---|
 | Holiday | Not a working day |
-| Absent (unpaid) | 1 unpaid day |
+| Nothing logged | 1 unpaid day (see below) |
 | Paid leave | 1 paid day, no deduction |
 | Half day (unpaid) | 0.5 unpaid day |
 | Half day (paid) | 0.5 paid day, no deduction |
 
-Marking a day replaces any earlier mark on it. Leave shows in green in the calendar grid and list. A full paid leave day is not counted as a working day left in Month Goal.
+**Log a Day** (Daily Log tab) has a *Day type* dropdown for the same marks (plus Holiday): Click any day in Calendar View to load it into Log a Day, with its hours and Day type, and change it from there. Paid leave and Unpaid leave (full day) need only a date (Unpaid leave removes any mark from the day, so it counts as unpaid once it has passed with nothing logged), and Half day (paid or unpaid) takes the hours you worked, or none to only mark the day. Full-day leave can't be added to a date that already has logged hours. Marking a day replaces any earlier mark on it. In the calendar, paid leave is solid green, a paid half day is a green diagonal split, and an unpaid half day is a red one (a half day that also has hours shows a green or red ½ badge). A full paid leave day is not counted as a working day left in Month Goal.
 
 **Salary.** Enter your **Monthly salary** once in the Salary Deduction card; it applies to every month. For the selected month:
 - Working days = days in the month minus Sundays and holidays.
-- Unpaid leave = absent days + 0.5 × unpaid half days (only working days count).
+- Unpaid leave = past working days with nothing logged + 0.5 × unpaid half days. Counting starts from your first logged day, and today is not counted until it has passed.
 - Deduction % = unpaid leave ÷ working days × 100, capped at 100.
 - Deduction = salary × deduction %. Take-home = salary − deduction.
 
-Days with nothing logged are not deducted unless you mark them Absent. Amounts are shown as plain numbers, with no currency symbol.
+There is no separate Absent mark: log hours, or mark the day as paid leave or a paid half day, otherwise it is unpaid. Amounts are shown as plain numbers, with no currency symbol.
 
-**Data.** Salary and leave are stored in the synced key `cmoPay` (`{ salary, leave: { "YYYY-MM-DD": "paid" | "paidHalf" | "unpaidHalf" } }`). Two devices merge it per date; a holiday or absence on a day beats a leave type for the same day. `cmoPay` is included in backups, and the server accepts it in `server/src/utils/validate.js`, so deploy the server before the client when updating.
+**Data.** Salary and leave are stored in the synced key `cmoPay` (`{ salary, leave: { "YYYY-MM-DD": "paid" | "paidHalf" | "unpaidHalf" } }`). Two devices merge it per date; a holiday on a day beats a leave type for the same day. `cmoPay` is included in backups, and the server accepts it in `server/src/utils/validate.js`, so deploy the server before the client when updating.
 
 ## Moving your existing data over
 On the old site: Settings → Backup → **Download backup**.
@@ -86,7 +86,7 @@ Open **https://clock-me-out.vercel.app/admin** and sign in with the admin email 
 | `PUT /api/state` | Replace the user's saved data |
 
 ## Versioning
-MAJOR.MINOR.PATCH+BUILD, kept in `client/package.json` and `server/package.json`. The header badge and `client/public/sw.js` are stamped from `client/package.json` by `npm run build` (script `client/scripts/stamp-version.mjs`). Badge shown (for example v3.12.12).
+MAJOR.MINOR.PATCH+BUILD, kept in `client/package.json` and `server/package.json`. The header badge and `client/public/sw.js` are stamped from `client/package.json` by `npm run build` (script `client/scripts/stamp-version.mjs`). Badge shown (for example v3.12.23).
 - **MAJOR:** a big redesign or a change that breaks saved data.
 - **MINOR:** a new feature.
 - **PATCH:** a fix or small tweak.
