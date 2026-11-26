@@ -8,7 +8,7 @@
    Every save names the cloud version it was based on, and the server refuses a save based on an old version, so a stale
    device can never overwrite newer data. When two devices both changed something, the changes are merged, not replaced. */
 (function () {
-  var KEYS = ['cmoLogEntries', 'cmoLogEntryCount', 'cmoShiftState', 'cmoHolidays', 'cmoAbsent', 'cmoUserName'];
+  var KEYS = ['cmoLogEntries', 'cmoLogEntryCount', 'cmoShiftState', 'cmoHolidays', 'cmoAbsent', 'cmoPay', 'cmoUserName'];
   var LS = window.localStorage, SP = Storage.prototype;
   var _get = SP.getItem, _set = SP.setItem, _rem = SP.removeItem, _clr = SP.clear;
   var token = null, api = null;
@@ -71,6 +71,22 @@
     base.forEach(function (x) { if (!l.has(x)) out.delete(x); });
     return Array.from(out).sort();
   }
+  // Salary and leave: { salary: number, leave: { 'YYYY-MM-DD': 'paid' | 'paidHalf' | 'unpaidHalf' } }
+  function payOf(v) {
+    var o = null; try { o = JSON.parse(v); } catch (e) {}
+    if (!o || typeof o !== 'object' || Array.isArray(o)) o = {};
+    var leave = o.leave && typeof o.leave === 'object' && !Array.isArray(o.leave) ? o.leave : {};
+    return { salary: Number(o.salary) || 0, leave: leave };
+  }
+  function mergePay(base, local, remote, preferRemote) {
+    var b = payOf(base), l = payOf(local), r = payOf(remote), out = { salary: 0, leave: {} }, k;
+    out.salary = l.salary === b.salary ? r.salary : r.salary === b.salary ? l.salary : (preferRemote ? r.salary : l.salary);
+    for (k in r.leave) out.leave[k] = r.leave[k];
+    for (k in l.leave) if (b.leave[k] !== l.leave[k]) out.leave[k] = l.leave[k];                          // added or changed here
+    for (k in b.leave) if (!(k in l.leave) && out.leave[k] === b.leave[k]) delete out.leave[k];          // removed here, untouched elsewhere
+    var sorted = {}; Object.keys(out.leave).sort().forEach(function (d) { sorted[d] = out.leave[d]; });
+    return JSON.stringify({ salary: out.salary, leave: sorted });
+  }
   // preferRemote: for single values changed in both places, take the cloud's (used when recovering a set-aside copy)
   function mergeState(base, local, remote, preferRemote) {
     var out = {};
@@ -80,6 +96,7 @@
       if (same(k, r, b)) { if (l !== undefined) out[k] = l; return; }   // changed only here: ours
       if (k === 'cmoLogEntries') out[k] = JSON.stringify(mergeEntries(arr(b), arr(l), arr(r)));
       else if (k === 'cmoHolidays' || k === 'cmoAbsent') out[k] = JSON.stringify(mergeSets(arr(b), arr(l), arr(r)));
+      else if (k === 'cmoPay') out[k] = mergePay(b, l, r, preferRemote);
       else if (preferRemote && r !== undefined) out[k] = r;
       else if (l !== undefined) out[k] = l;
       else if (r !== undefined) out[k] = r;
@@ -94,8 +111,8 @@
   function richer(local, srv) {
     var have = mapOf(arr(srv.cmoLogEntries)), list = arr(local.cmoLogEntries), i;
     for (i = 0; i < list.length; i++) if (!(eKey(list[i]) in have)) return true;
-    var h = new Set(arr(srv.cmoHolidays).concat(arr(srv.cmoAbsent)));
-    return arr(local.cmoHolidays).concat(arr(local.cmoAbsent)).some(function (x) { return !h.has(x); });
+    var h = new Set(arr(srv.cmoHolidays).concat(arr(srv.cmoAbsent), Object.keys(payOf(srv.cmoPay).leave)));
+    return arr(local.cmoHolidays).concat(arr(local.cmoAbsent), Object.keys(payOf(local.cmoPay).leave)).some(function (x) { return !h.has(x); });
   }
 
   // ---------- talking to the cloud ----------
@@ -1620,8 +1637,8 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   /* ---- Overview / Daily Log views ---- */
   .wrap[hidden] { display: none; }
   .wrap.wrap-overview,
-  .wrap.wrap-log,
-  .wrap.wrap-me { grid-template-columns: 1fr 1.05fr 1fr; max-width: 1360px; }
+  .wrap.wrap-log { grid-template-columns: 1fr 1.05fr 1fr; max-width: 1360px; }
+  .wrap.wrap-me { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 1360px; }
   .view-bar {
     display: flex;
     align-items: center;
@@ -1670,11 +1687,11 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   body.dark-mode .log-chip.behind { background: rgba(240, 196, 138, 0.12); border-color: #F0C48A; color: #F5C77E; }
   @media (max-width: 1100px) {
     .wrap.wrap-overview,
-    .wrap.wrap-log,
-    .wrap.wrap-me { grid-template-columns: 1fr 1fr; max-width: 900px; }
+    .wrap.wrap-log { grid-template-columns: 1fr 1fr; max-width: 900px; }
+    .wrap.wrap-me { max-width: 900px; }
+    #mePayCard .me-tile-value { font-size: 18px; }
     .wrap.wrap-overview > .col:nth-child(3),
-    .wrap.wrap-log > .col:nth-child(3),
-    .wrap.wrap-me > #mePastCol { grid-column: 1 / -1; }
+    .wrap.wrap-log > .col:nth-child(3) { grid-column: 1 / -1; }
   }
   @media (max-width: 780px) {
     .wrap.wrap-overview,
@@ -1761,14 +1778,6 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   .me-goal-main.ahead { color: var(--good); }
   .me-goal-sub { margin-top: 6px; font-size: 13px; line-height: 1.45; color: var(--muted); }
   .me-off-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; font-size: 13px; font-weight: 700; color: var(--muted); }
-  .me-wd-row { display: grid; grid-template-columns: 34px 1fr 64px; align-items: center; gap: 10px; margin-bottom: 9px; font-size: 13px; }
-  .me-wd-name { font-weight: 700; color: var(--deep); }
-  .me-wd-track { position: relative; height: 12px; background: var(--sky-light); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
-  .me-wd-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: var(--good); }
-  .me-wd-fill.short { background: #E9A44D; }
-  .me-wd-mark { position: absolute; top: -1px; bottom: -1px; width: 2px; background: var(--deep); opacity: 0.45; }
-  .me-wd-val { text-align: right; font-weight: 700; color: var(--deep); font-variant-numeric: tabular-nums; }
-  .me-wd-val.none { color: var(--muted); font-weight: 600; }
   .me-insight { margin-top: 6px; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
   .me-insight:empty { display: none; }
   .me-pm-row { display: grid; grid-template-columns: 78px 1fr 74px 24px; align-items: center; gap: 8px; margin-bottom: 11px; }
@@ -1851,7 +1860,8 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     background: var(--card); color: var(--deep); font: inherit; font-size: 14px; outline: none;
   }
   .holiday-add-row select:focus { border-color: var(--sky); }
-  .wrap.wrap-me.me-two-col { grid-template-columns: 1fr 1fr; max-width: 1000px; }
+  .wrap.wrap-me.me-two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 900px; }
+  .wrap-me > .app-footer { grid-column: 1 / -1; }
   @media (max-width: 780px) { .wrap.wrap-me.me-two-col { grid-template-columns: 1fr; } }
   .me-pm-row.sel .me-pm-label { color: var(--sky); }
   .holiday-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; min-height: 34px; }
@@ -2117,6 +2127,24 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   body.dark-mode .calendar-cell.is-absent { background: rgba(255, 107, 96, 0.16); color: #FF8A80; }
   .calendar-dot.holiday { background: #8B6CE0; }
   .calendar-dot.absent { background: #E0453C; }
+  .calendar-cell.is-leave { background: rgba(46, 160, 120, 0.15); color: #1F8A62; }
+  body.dark-mode .calendar-cell.is-leave { background: rgba(80, 200, 150, 0.16); color: #7BE0B5; }
+  .cal-st.leave { color: #1F8A62; }
+  body.dark-mode .cal-st.leave { color: #7BE0B5; }
+  .me-pill.leave, .holiday-chip.leave { background: #E7F7F0; border-color: #A8DEC6; color: #1F6F51; }
+  body.dark-mode .me-pill.leave, body.dark-mode .holiday-chip.leave { background: rgba(123, 224, 181, 0.12); color: #7BE0B5; }
+  .holiday-add-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .holiday-add-row input, .holiday-add-row select { width: 100%; min-width: 0; height: 42px; box-sizing: border-box; }
+  .holiday-add-row .me-save-btn { grid-column: 1 / -1; width: 100%; }
+  .me-pay-salary { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .me-pay-salary label { font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+  .me-pay-salary input {
+    flex: 1; min-width: 0; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 10px;
+    background: var(--card); color: var(--deep); font: inherit; font-size: 15px; font-weight: 700; outline: none; font-variant-numeric: tabular-nums;
+  }
+  .me-pay-salary input:focus { border-color: var(--sky); }
+  .me-tile-value.cut { color: #C0392B; }
+  body.dark-mode .me-tile-value.cut { color: #FF8A80; }
   /* Sound style picker */
   .sound-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
   .sound-opt { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; font: inherit; font-size: 13px; font-weight: 700;
@@ -2392,7 +2420,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   <div class="brand">
     <span class="brand-text">
       <span class="app-header-title" id="brandTitle" role="link" tabindex="0" title="Go to Shift Details">Clock me Out</span>
-      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.12.1</span></span>
+      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.12.12</span></span>
     </span>
   </div>
   <div class="view-bar" id="viewBar" data-view="overview">
@@ -2737,13 +2765,27 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   </div>
 
   <div class="col">
-    <div class="card">
-      <div class="card-title"><span id="meWeekdayTitle">🗓️ Weekday Pattern</span></div>
-      <div id="meWeekdays"></div>
-      <div class="me-insight" id="meWeekdayInsight"></div>
+    <div class="card" id="mePayCard">
+      <div class="card-title"><span>💰 Salary Deduction</span></div>
+      <div class="me-pay-salary">
+        <label for="meSalaryInput">Monthly salary</label>
+        <input type="number" id="meSalaryInput" inputmode="decimal" min="0" step="any" placeholder="e.g. 30000" autocomplete="off">
+      </div>
+      <div class="me-tiles">
+        <div class="me-tile"><span class="me-tile-label">Working days</span><b class="me-tile-value" id="mePayWork">—</b><span class="me-tile-sub" id="mePayWorkSub">&nbsp;</span></div>
+        <div class="me-tile"><span class="me-tile-label">Unpaid leave</span><b class="me-tile-value" id="mePayUnpaid">—</b><span class="me-tile-sub" id="mePayUnpaidSub">&nbsp;</span></div>
+        <div class="me-tile"><span class="me-tile-label">Paid leave</span><b class="me-tile-value" id="mePayPaid">—</b><span class="me-tile-sub" id="mePayPaidSub">&nbsp;</span></div>
+        <div class="me-tile"><span class="me-tile-label">Deduction %</span><b class="me-tile-value" id="mePayPct">—</b><span class="me-tile-sub" id="mePayPctSub">&nbsp;</span></div>
+        <div class="me-tile"><span class="me-tile-label">Deduction</span><b class="me-tile-value" id="mePayCut">—</b><span class="me-tile-sub" id="mePayCutSub">&nbsp;</span></div>
+        <div class="me-tile"><span class="me-tile-label">Take-home</span><b class="me-tile-value" id="mePayNet">—</b><span class="me-tile-sub" id="mePayNetSub">&nbsp;</span></div>
+      </div>
+      <div class="me-insight" id="mePayFormula"></div>
+      <div class="me-off-row me-leave-row">
+        <span id="meLeaveLine">Leave: None</span>
+        <button type="button" class="me-link-btn" id="meLeaveEdit">✏️ Edit</button>
+      </div>
+      <div class="me-pills" id="meLeavePills"></div>
     </div>
-
-    <div class="app-footer footer-desktop">© 2026 Basil Melepat · Designed for You</div>
   </div>
 
   <div class="col" id="mePastCol" hidden>
@@ -2753,6 +2795,8 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
       <div class="me-insight" id="mePastInsight"></div>
     </div>
   </div>
+
+  <div class="app-footer footer-desktop">© 2026 Basil Melepat · Designed for You</div>
 </div>
 
 <div class="wrap wrap-settings" id="viewSettings" hidden>
@@ -2940,7 +2984,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
 <div class="modal-overlay" id="holidayOverlay" style="display:none;">
   <div class="modal-box">
     <div class="modal-header">
-      <span id="holidayModalTitle">🗓️ Holidays & absences</span>
+      <span id="holidayModalTitle">🗓️ Holidays, leave & absences</span>
       <button class="modal-close" id="holidayCloseBtn" type="button" aria-label="Close">❌</button>
     </div>
     <div class="holiday-list" id="holidayList"></div>
@@ -2948,12 +2992,15 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
       <input type="date" id="holidayDateInput" aria-label="Date">
       <select id="holidayTypeSelect" aria-label="Type">
         <option value="holiday">Holiday</option>
-        <option value="absent">Absent</option>
+        <option value="absent">Absent (unpaid)</option>
+        <option value="paid">Paid leave</option>
+        <option value="unpaidHalf">Half day (unpaid)</option>
+        <option value="paidHalf">Half day (paid)</option>
       </select>
       <button class="me-save-btn" id="holidayAddBtn" type="button">Add</button>
     </div>
     <div class="log-paste-feedback" id="holidayFeedback"></div>
-    <div class="modal-hint">Holidays and absent days aren't counted as working days left in the Month Goal. Both are also picked up from your attendance sheet when you import it.</div>
+    <div class="modal-hint">Holidays and full-day leave aren't counted as working days left in the Month Goal. Absent and half-day (unpaid) days feed the Salary Deduction. Holidays and absences are also picked up from your attendance sheet when you import it.</div>
     <div class="holiday-actions">
       <button class="log-io-btn" id="holidayClearBtn" type="button">🗑️ Clear month</button>
       <button class="modal-import-btn" id="holidayDoneBtn" type="button">Done</button>
@@ -5147,6 +5194,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   function calendarDayKind(iso, dow, entry, todayISO, firstLoggedISO) {
     if (entry) return 'entry';
     if (holidays.has(iso)) return 'holiday';
+    if (leaveDays.has(iso)) return 'leave';
     // Past working days with nothing logged read as absent, but only from the first logged day on
     if (absentDays.has(iso) || (firstLoggedISO && iso >= firstLoggedISO && iso < todayISO && !isWeeklyOffDay(dow))) return 'absent';
     return 'none';
@@ -5217,7 +5265,8 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
       calendarYear, calendarMonth, todayISO, firstLoggedISO, calView,
       logEntries.filter(e => e.date && e.date.startsWith(monthPrefix)).map(e => `${e.id}:${e.date}:${e.hh}:${e.mm}:${e.ss}:${e.target}`).join(','),
       [...holidays].filter(d => d.startsWith(monthPrefix)).sort().join(','),
-      [...absentDays].filter(d => d.startsWith(monthPrefix)).sort().join(',')
+      [...absentDays].filter(d => d.startsWith(monthPrefix)).sort().join(','),
+      [...leaveDays].filter(([d]) => d.startsWith(monthPrefix)).sort().join(',')
     ].join('|');
     if (sig === calendarSig && calendarGrid.firstChild) { applyCalendarLive(); return; }
     calendarSig = sig;
@@ -5247,6 +5296,10 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
         cell.classList.add('is-holiday');
         cell.title = 'Holiday. Click to add an entry for this day';
         hoursHtml = '<span class="cal-day-hours cal-day-tag">Holiday</span>';
+      } else if (kind === 'leave') {
+        cell.classList.add('is-leave');
+        cell.title = `${LEAVE_LABEL[leaveDays.get(iso)]}. Click to add an entry for this day`;
+        hoursHtml = `<span class="cal-day-hours cal-day-tag">${{ paid: 'Paid leave', paidHalf: '½ paid', unpaidHalf: '½ unpaid' }[leaveDays.get(iso)]}</span>`;
       } else if (kind === 'absent') {
         cell.classList.add('is-absent');
         cell.title = 'Absent (nothing logged). Click to add an entry for this day';
@@ -5282,6 +5335,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
         clocked = `${pad(entry.hh)}:${pad(entry.mm)}:${pad(entry.ss)}`; clockedCls = '';
         diff = formatDiffMinSec(diffSec); diffCls = ' ' + (diffSec < 0 ? 'short' : diffSec > 0 ? 'ahead' : 'exact');
       } else if (kind === 'holiday') { status = 'holiday'; label = 'Holiday'; }
+      else if (kind === 'leave') { status = 'leave'; label = LEAVE_LABEL[leaveDays.get(iso)]; }
       else if (kind === 'absent') { status = 'absent'; label = 'Absent'; }
       else if (isWeeklyOffDay(d.getDay())) { status = 'off'; label = 'Weekly off'; }
       else if (iso === todayISO) { status = 'pending'; label = 'Not logged yet'; }
@@ -5788,9 +5842,9 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   let userName = '';
   let meMonthKey = null; // null = the current month, otherwise 'YYYY-MM' of an earlier month
   let holidays = new Set(); // 'YYYY-MM-DD' dates that aren't working days
-  let absentDays = new Set(); // 'YYYY-MM-DD' working days you were absent
-
-  function entryWeekday(e) { const { y, m, d } = dateParts(e.date); return new Date(y, m - 1, d).getDay(); }
+  let absentDays = new Set(); // 'YYYY-MM-DD' working days you were absent (unpaid, full day)
+  let leaveDays = new Map(); // 'YYYY-MM-DD' -> 'paid' | 'paidHalf' | 'unpaidHalf'
+  let monthlySalary = 0;
 
   // Consecutive logged days that met their target, counting back from the end
   // of the given month (or from the latest entry when no month is given).
@@ -5812,10 +5866,52 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     try { localStorage.setItem('cmoAbsent', JSON.stringify([...absentDays].sort())); } catch (e) { /* storage unavailable */ }
   }
 
-  // A day is either a holiday or an absence, never both
-  function addHolidays(list) { list.forEach(d => { holidays.add(d); absentDays.delete(d); }); saveHolidays(); saveAbsent(); }
+  function savePay() {
+    const leave = {};
+    [...leaveDays.keys()].sort().forEach(d => { leave[d] = leaveDays.get(d); });
+    try { localStorage.setItem('cmoPay', JSON.stringify({ salary: monthlySalary, leave })); } catch (e) { /* storage unavailable */ }
+  }
 
-  function addAbsences(list) { list.forEach(d => { absentDays.add(d); holidays.delete(d); }); saveHolidays(); saveAbsent(); }
+  function saveMarks() { saveHolidays(); saveAbsent(); savePay(); }
+
+  // A day carries exactly one mark: holiday, absent (unpaid), or a leave type
+  const LEAVE_LABEL = { paid: 'Paid leave', paidHalf: 'Half day · paid', unpaidHalf: 'Half day · unpaid' };
+  const MARK_LABEL = { holiday: 'a holiday', absent: 'absent', paid: 'paid leave', paidHalf: 'a paid half day', unpaidHalf: 'an unpaid half day' };
+  function markOf(d) { return holidays.has(d) ? 'holiday' : absentDays.has(d) ? 'absent' : leaveDays.get(d) || null; }
+  function setMark(d, mark) {
+    holidays.delete(d); absentDays.delete(d); leaveDays.delete(d);
+    if (mark === 'holiday') holidays.add(d);
+    else if (mark === 'absent') absentDays.add(d);
+    else if (LEAVE_LABEL[mark]) leaveDays.set(d, mark);
+  }
+  function addHolidays(list) { list.forEach(d => setMark(d, 'holiday')); saveMarks(); }
+
+  function addAbsences(list) { list.forEach(d => setMark(d, 'absent')); saveMarks(); }
+
+  function leaveInMonth(y, m) {
+    const prefix = monthPrefix(y, m);
+    return [...leaveDays].filter(([d]) => d.startsWith(prefix)).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  }
+
+  const fmtDays = n => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+  const fmtMoney = n => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtPct = n => `${Math.round(n * 100) / 100}%`;
+
+  // Unpaid share of the month's working days. Only working days count (not Sundays or holidays).
+  function salaryBreakdown(y, m) {
+    const prefix = monthPrefix(y, m);
+    const working = d => !isWeeklyOffDay(new Date(d + 'T00:00:00').getDay()) && !holidays.has(d);
+    const workingDays = workingDaysInMonth(y, m);
+    let unpaid = [...absentDays].filter(d => d.startsWith(prefix) && working(d)).length;
+    let paid = 0;
+    leaveDays.forEach((type, d) => {
+      if (!d.startsWith(prefix) || !working(d)) return;
+      if (type === 'paid') paid += 1; else if (type === 'paidHalf') paid += 0.5; else if (type === 'unpaidHalf') unpaid += 0.5;
+    });
+    const pct = workingDays ? Math.min(100, unpaid / workingDays * 100) : 0;
+    const cut = monthlySalary * pct / 100;
+    return { workingDays, unpaid, paid, pct, cut, net: monthlySalary - cut };
+  }
 
   function holidaysInMonth(y, m) {
     const prefix = monthPrefix(y, m);
@@ -5945,7 +6041,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
         if (d === now.getDate() && loggedToday) continue;
         if (isWeeklyOffDay(new Date(y, m, d).getDay())) continue;
         const dayKey = `${y}-${pad(m + 1)}-${pad(d)}`;
-        if (holidays.has(dayKey) || absentDays.has(dayKey)) continue;
+        if (holidays.has(dayKey) || absentDays.has(dayKey) || leaveDays.get(dayKey) === 'paid') continue;
         remaining++;
       }
     }
@@ -5976,28 +6072,22 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     $('meAbsentLine').textContent = `Absent: ${monthAbsences.length} in ${monthName}`;
     $('meAbsentPills').innerHTML = monthAbsences.map(d => `<span class="me-pill absent">${fmtDay(d)}</span>`).join('');
 
-    // Weekday pattern: only the month picked in the first card
-    $('meWeekdayTitle').textContent = `🗓️ Weekday Pattern · ${monthName}`;
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const agg = dayNames.map(() => ({ sum: 0, n: 0 }));
-    cur.filter(e => e.date).forEach(e => { const a = agg[entryWeekday(e)]; a.sum += entrySeconds(e); a.n++; });
-    const avgs = agg.map(a => (a.n ? a.sum / a.n : null));
-    const maxAvg = Math.max(targetSec, ...avgs.filter(v => v !== null));
-    const scale = maxAvg * 1.08;
-    $('meWeekdays').innerHTML = [1, 2, 3, 4, 5, 6, 0].map(wd => {
-      const v = avgs[wd];
-      if (v === null) return `<div class="me-wd-row"><span class="me-wd-name">${dayNames[wd]}</span><div class="me-wd-track"><i class="me-wd-mark" style="left:${(targetSec / scale * 100).toFixed(1)}%"></i></div><span class="me-wd-val none">—</span></div>`;
-      const cls = v >= targetSec - 30 ? '' : ' short';
-      return `<div class="me-wd-row"><span class="me-wd-name">${dayNames[wd]}</span><div class="me-wd-track"><i class="me-wd-fill${cls}" style="width:${(v / scale * 100).toFixed(1)}%"></i><i class="me-wd-mark" style="left:${(targetSec / scale * 100).toFixed(1)}%"></i></div><span class="me-wd-val">${fmtHM(v)}</span></div>`;
-    }).join('');
-    const withData = [1, 2, 3, 4, 5, 6, 0].filter(wd => avgs[wd] !== null);
-    if (withData.length >= 2) {
-      const hi = withData.reduce((a, b) => (avgs[b] > avgs[a] ? b : a));
-      const lo = withData.reduce((a, b) => (avgs[b] < avgs[a] ? b : a));
-      $('meWeekdayInsight').textContent = hi === lo ? '' : `Strongest: ${dayNames[hi]} (${fmtHM(avgs[hi])}) · Lightest: ${dayNames[lo]} (${fmtHM(avgs[lo])}). The line marks your target.`;
-    } else {
-      $('meWeekdayInsight').textContent = `Log a few more days in ${monthName} to see your weekly pattern.`;
-    }
+    // Salary deduction for the selected month
+    const sb = salaryBreakdown(y, m);
+    const salaryInput = $('meSalaryInput');
+    if (document.activeElement !== salaryInput) salaryInput.value = monthlySalary ? String(monthlySalary) : '';
+    const monthLeave = leaveInMonth(y, m);
+    $('meLeaveLine').textContent = `Leave: ${monthLeave.length ? monthLeave.length : 'None'} in ${monthName}`;
+    $('meLeavePills').innerHTML = monthLeave.map(([d, t]) => `<span class="me-pill leave">${fmtDay(d)} · ${LEAVE_LABEL[t]}</span>`).join('');
+    setTile('mePayWork', String(sb.workingDays), `in ${monthName}`);
+    setTile('mePayUnpaid', fmtDays(sb.unpaid), sb.unpaid === 1 ? 'day' : 'days', sb.unpaid ? 'cut' : '');
+    setTile('mePayPaid', fmtDays(sb.paid), sb.paid === 1 ? 'day, no deduction' : 'days, no deduction');
+    setTile('mePayPct', sb.workingDays ? fmtPct(sb.pct) : '—', sb.workingDays ? 'of salary' : 'no working days', sb.pct ? 'cut' : '');
+    setTile('mePayCut', monthlySalary ? fmtMoney(sb.cut) : '—', monthlySalary ? '' : 'add your salary', sb.cut ? 'cut' : '');
+    setTile('mePayNet', monthlySalary ? fmtMoney(sb.net) : '—', monthlySalary ? `of ${fmtMoney(monthlySalary)}` : '');
+    $('mePayFormula').textContent = sb.workingDays
+      ? `${fmtDays(sb.unpaid)} unpaid ÷ ${sb.workingDays} working days = ${fmtPct(sb.pct)}. Absent days and unpaid half days count; paid leave doesn't. Days with nothing logged aren't counted unless you mark them Absent.`
+      : `There are no working days in ${monthName}.`;
 
     // Past months (read-only history, newest first)
     const months = {};
@@ -6043,12 +6133,13 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   function renderHolidayModal() {
     const { y, m } = selectedMonth();
     const monthTitle = new Date(y, m, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-    document.getElementById('holidayModalTitle').textContent = `🗓️ Holidays & absences · ${monthTitle}`;
+    document.getElementById('holidayModalTitle').textContent = `🗓️ Holidays, leave & absences · ${monthTitle}`;
     const chips = holidaysInMonth(y, m).map(d => ({ d, type: 'holiday' }))
       .concat(absencesInMonth(y, m).map(d => ({ d, type: 'absent' })))
+      .concat(leaveInMonth(y, m).map(([d, type]) => ({ d, type })))
       .sort((a, b) => (a.d < b.d ? -1 : 1));
     document.getElementById('holidayList').innerHTML = chips.length
-      ? chips.map(c => `<span class="holiday-chip${c.type === 'absent' ? ' absent' : ''}">${fmtDay(c.d, true)}${c.type === 'absent' ? ' · Absent' : ''}<button type="button" data-date="${c.d}" aria-label="Remove ${fmtDay(c.d)}">×</button></span>`).join('')
+      ? chips.map(c => `<span class="holiday-chip${c.type === 'absent' ? ' absent' : LEAVE_LABEL[c.type] ? ' leave' : ''}">${fmtDay(c.d, true)}${c.type === 'absent' ? ' · Absent' : LEAVE_LABEL[c.type] ? ` · ${LEAVE_LABEL[c.type]}` : ''}<button type="button" data-date="${c.d}" aria-label="Remove ${fmtDay(c.d)}">×</button></span>`).join('')
       : `<span class="holiday-empty">Nothing marked for ${new Date(y, m, 1).toLocaleDateString(undefined, { month: 'long' })}.</span>`;
     const input = document.getElementById('holidayDateInput');
     input.min = `${y}-${pad(m + 1)}-01`;
@@ -6075,13 +6166,14 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     fb.className = 'log-paste-feedback error';
     if (!input.value) { fb.textContent = 'Pick a date first.'; return; }
     if (!input.value.startsWith(monthPrefix(y, m))) { fb.textContent = `Pick a date inside ${new Date(y, m, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}.`; return; }
-    if ((type === 'holiday' ? holidays : absentDays).has(input.value)) { fb.textContent = `That day is already marked as ${type === 'holiday' ? 'a holiday' : 'absent'}.`; return; }
-    (type === 'holiday' ? addHolidays : addAbsences)([input.value]); // moves it if it was marked the other way
+    if (markOf(input.value) === type) { fb.textContent = `That day is already marked as ${MARK_LABEL[type]}.`; return; }
+    setMark(input.value, type); // moves it if it was marked another way
+    saveMarks();
     fb.textContent = '';
     input.value = '';
     renderHolidayModal();
     renderMyMonth();
-    toast(type === 'holiday' ? '🎉 Holiday added' : '🤒 Absence added');
+    toast(type === 'holiday' ? '🎉 Holiday added' : type === 'absent' ? '🤒 Absence added' : `🌴 ${LEAVE_LABEL[type]} added`);
   }
 
   // ❌ on each Past Months row deletes that month's data
@@ -6094,10 +6186,11 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     const ids = new Set(gone.map(e => e.id));
     const goneHolidays = [...holidays].filter(d => d.startsWith(key + '-'));
     const goneAbsences = [...absentDays].filter(d => d.startsWith(key + '-'));
+    const goneLeave = [...leaveDays].filter(([d]) => d.startsWith(key + '-'));
     goneHolidays.forEach(d => holidays.delete(d));
     goneAbsences.forEach(d => absentDays.delete(d));
-    saveHolidays();
-    saveAbsent();
+    goneLeave.forEach(([d]) => leaveDays.delete(d));
+    saveMarks();
     logEntries = logEntries.filter(e => !ids.has(e.id));
     if (logEditingId !== null && ids.has(logEditingId)) cancelEditLogEntry();
     if (meMonthKey === key) meMonthKey = null;
@@ -6108,8 +6201,8 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     toast('🗑️ Month deleted', () => {
       goneHolidays.forEach(d => holidays.add(d));
       goneAbsences.forEach(d => absentDays.add(d));
-      saveHolidays();
-      saveAbsent();
+      goneLeave.forEach(([d, t]) => leaveDays.set(d, t));
+      saveMarks();
       restoreLogEntries(gone);
       toast('↩️ Month restored');
     });
@@ -6132,6 +6225,22 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
 
   document.getElementById('meHolidayEdit').addEventListener('click', openHolidayModal);
 
+  document.getElementById('meLeaveEdit').addEventListener('click', openHolidayModal);
+
+  function saveSalaryFromInput() {
+    const input = document.getElementById('meSalaryInput');
+    const raw = input.value.trim();
+    const n = raw === '' ? 0 : Number(raw);
+    if (!Number.isFinite(n) || n < 0 || n > 1e9) { input.value = monthlySalary ? String(monthlySalary) : ''; toast('Enter a salary between 0 and 1,000,000,000'); return; }
+    const next = Math.round(n * 100) / 100;
+    if (next === monthlySalary) return;
+    monthlySalary = next;
+    savePay();
+    renderMyMonth();
+  }
+  document.getElementById('meSalaryInput').addEventListener('change', saveSalaryFromInput);
+  document.getElementById('meSalaryInput').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
+
   document.getElementById('holidayCloseBtn').addEventListener('click', closeHolidayModal);
 
   document.getElementById('holidayDoneBtn').addEventListener('click', closeHolidayModal);
@@ -6145,18 +6254,14 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   document.getElementById('holidayList').addEventListener('click', e => {
     const btn = e.target.closest('button[data-date]');
     if (!btn) return;
-    const day = btn.dataset.date, wasHoliday = holidays.has(day), wasAbsent = absentDays.has(day);
-    holidays.delete(day);
-    absentDays.delete(day);
-    saveHolidays();
-    saveAbsent();
+    const day = btn.dataset.date, was = markOf(day);
+    setMark(day, null);
+    saveMarks();
     renderHolidayModal();
     renderMyMonth();
     toast('Day removed', () => {
-      if (wasHoliday) holidays.add(day);
-      if (wasAbsent) absentDays.add(day);
-      saveHolidays();
-      saveAbsent();
+      setMark(day, was);
+      saveMarks();
       renderHolidayModal();
       renderMyMonth();
       toast('↩️ Day restored');
@@ -6165,21 +6270,21 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
 
   document.getElementById('holidayClearBtn').addEventListener('click', () => {
     const { y, m } = selectedMonth();
-    const goneHolidays = holidaysInMonth(y, m), goneAbsences = absencesInMonth(y, m);
+    const goneHolidays = holidaysInMonth(y, m), goneAbsences = absencesInMonth(y, m), goneLeave = leaveInMonth(y, m);
     goneHolidays.forEach(d => holidays.delete(d));
     goneAbsences.forEach(d => absentDays.delete(d));
-    saveHolidays();
-    saveAbsent();
+    goneLeave.forEach(([d]) => leaveDays.delete(d));
+    saveMarks();
     renderHolidayModal();
     renderMyMonth();
-    toast('🗑️ Month cleared of holidays and absences', () => {
+    toast('🗑️ Month cleared of holidays, leave and absences', () => {
       goneHolidays.forEach(d => holidays.add(d));
       goneAbsences.forEach(d => absentDays.add(d));
-      saveHolidays();
-      saveAbsent();
+      goneLeave.forEach(([d, t]) => leaveDays.set(d, t));
+      saveMarks();
       renderHolidayModal();
       renderMyMonth();
-      toast('↩️ Holidays and absences restored');
+      toast('↩️ Holidays, leave and absences restored');
     });
   });
 
@@ -6189,7 +6294,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   // ========================================================================
 
   const meNameInput = document.getElementById('meNameInput'), meNameSave = document.getElementById('meNameSave');
-  const BACKUP_KEYS = ['cmoLogEntries', 'cmoLogEntryCount', 'cmoShiftState', 'cmoHolidays', 'cmoAbsent', 'cmoUserName'];
+  const BACKUP_KEYS = ['cmoLogEntries', 'cmoLogEntryCount', 'cmoShiftState', 'cmoHolidays', 'cmoAbsent', 'cmoPay', 'cmoUserName'];
   const backupHint = document.getElementById('backupHint');
   const backupFileInput = document.getElementById('backupFileInput');
   const resetOverlay = document.getElementById('resetOverlay');
@@ -6245,6 +6350,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
         if (valid && 'cmoLogEntries' in data && !Array.isArray(JSON.parse(data.cmoLogEntries))) valid = false;
         if (valid && 'cmoHolidays' in data && !Array.isArray(JSON.parse(data.cmoHolidays))) valid = false;
         if (valid && 'cmoAbsent' in data && !Array.isArray(JSON.parse(data.cmoAbsent))) valid = false;
+        if (valid && 'cmoPay' in data && (typeof JSON.parse(data.cmoPay) !== 'object' || JSON.parse(data.cmoPay) === null)) valid = false;
         if (valid && 'cmoShiftState' in data && typeof JSON.parse(data.cmoShiftState) !== 'object') valid = false;
       } catch (e) { valid = false; }
       if (!valid) { backupMessage('That doesn\'t look like a Clock me Out backup file.', true); return; }
@@ -7092,6 +7198,12 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     userName = localStorage.getItem('cmoUserName') || '';
     holidays = new Set(JSON.parse(localStorage.getItem('cmoHolidays') || '[]').filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)));
     absentDays = new Set(JSON.parse(localStorage.getItem('cmoAbsent') || '[]').filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)));
+    const pay = JSON.parse(localStorage.getItem('cmoPay') || '{}') || {};
+    monthlySalary = Number.isFinite(Number(pay.salary)) && Number(pay.salary) > 0 ? Number(pay.salary) : 0;
+    Object.entries(pay.leave && typeof pay.leave === 'object' ? pay.leave : {}).forEach(([d, t]) => {
+      // a holiday or absence marked on another device wins over a leave type for the same day
+      if (/^\d{4}-\d{2}-\d{2}$/.test(d) && LEAVE_LABEL[t] && !holidays.has(d) && !absentDays.has(d)) leaveDays.set(d, t);
+    });
   } catch (e) { /* storage unavailable or corrupt: start with no holidays */ }
 
   // Phones: the bottom bar steps aside while a text, number, date or time field is focused

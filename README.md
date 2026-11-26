@@ -6,7 +6,7 @@ React sign-in page · Express API · MongoDB.
 ```
 clock-me-out/
 ├── client/
-│   ├── public/app.html   the Clock me Out app (v3.12.1) with cloud sync and a "Sign out" row in Settings
+│   ├── public/app.html   the Clock me Out app (v3.12.12) with cloud sync and a "Sign out" row in Settings
 │   └── src/              sign-in page (Google or email) and the admin dashboard
 └── server/               Express API
 ```
@@ -33,6 +33,31 @@ Signing out is under **Settings → Cloud sync → Sign out**.
 10. **Settings → Preferences → Theme** has six colour themes (Ocean, Forest, Sunset, Grape, Rose, Slate), each with a light and a dark look, plus a Light/Dark switch. The choice is saved on this device and also colours the sign-in page and the admin dashboard.
 11. Main actions (starting or stopping a shift, adding breaks, logging days, holidays, backup, name) show a short toast message. In the admin dashboard, disabling, enabling, unlocking and deleting do too.
 12. Theme, pointer effects and sound stay per device.
+
+## Overview tab and salary deduction
+The Overview tab shows the month summary tiles, then **Month Goal**, **Salary Deduction** and **Past Months** side by side (desktop and tablet; they stack on phones, and Past Months only appears once earlier months have logs). Everything follows the month picked at the top.
+
+**Marking days.** **Edit** (on Month Goal or Salary Deduction) opens *Holidays, leave & absences*. Each day carries one mark:
+
+| Mark | Counts as |
+|---|---|
+| Holiday | Not a working day |
+| Absent (unpaid) | 1 unpaid day |
+| Paid leave | 1 paid day, no deduction |
+| Half day (unpaid) | 0.5 unpaid day |
+| Half day (paid) | 0.5 paid day, no deduction |
+
+Marking a day replaces any earlier mark on it. Leave shows in green in the calendar grid and list. A full paid leave day is not counted as a working day left in Month Goal.
+
+**Salary.** Enter your **Monthly salary** once in the Salary Deduction card; it applies to every month. For the selected month:
+- Working days = days in the month minus Sundays and holidays.
+- Unpaid leave = absent days + 0.5 × unpaid half days (only working days count).
+- Deduction % = unpaid leave ÷ working days × 100, capped at 100.
+- Deduction = salary × deduction %. Take-home = salary − deduction.
+
+Days with nothing logged are not deducted unless you mark them Absent. Amounts are shown as plain numbers, with no currency symbol.
+
+**Data.** Salary and leave are stored in the synced key `cmoPay` (`{ salary, leave: { "YYYY-MM-DD": "paid" | "paidHalf" | "unpaidHalf" } }`). Two devices merge it per date; a holiday or absence on a day beats a leave type for the same day. `cmoPay` is included in backups, and the server accepts it in `server/src/utils/validate.js`, so deploy the server before the client when updating.
 
 ## Moving your existing data over
 On the old site: Settings → Backup → **Download backup**.
@@ -61,7 +86,7 @@ Open **https://clock-me-out.vercel.app/admin** and sign in with the admin email 
 | `PUT /api/state` | Replace the user's saved data |
 
 ## Versioning
-MAJOR.MINOR.PATCH+BUILD, kept in `client/package.json` and `server/package.json`. The header badge and `client/public/sw.js` are stamped from `client/package.json` by `npm run build` (script `client/scripts/stamp-version.mjs`). Badge shown (for example v3.12.1).
+MAJOR.MINOR.PATCH+BUILD, kept in `client/package.json` and `server/package.json`. The header badge and `client/public/sw.js` are stamped from `client/package.json` by `npm run build` (script `client/scripts/stamp-version.mjs`). Badge shown (for example v3.12.12).
 - **MAJOR:** a big redesign or a change that breaks saved data.
 - **MINOR:** a new feature.
 - **PATCH:** a fix or small tweak.

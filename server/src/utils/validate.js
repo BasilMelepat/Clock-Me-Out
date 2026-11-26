@@ -1,5 +1,5 @@
 // The only keys the app is allowed to sync (they match the original app's backup keys).
-export const STATE_KEYS = ["cmoLogEntries", "cmoLogEntryCount", "cmoShiftState", "cmoHolidays", "cmoAbsent", "cmoUserName"];
+export const STATE_KEYS = ["cmoLogEntries", "cmoLogEntryCount", "cmoShiftState", "cmoHolidays", "cmoAbsent", "cmoPay", "cmoUserName"];
 const MAX_BYTES = 1_500_000;
 
 export function cleanState(input) {
