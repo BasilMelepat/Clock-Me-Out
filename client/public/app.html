@@ -2455,7 +2455,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   <div class="brand">
     <span class="brand-text">
       <span class="app-header-title" id="brandTitle" role="link" tabindex="0" title="Go to Shift Details">Clock me Out</span>
-      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.12.34</span></span>
+      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.12.36</span></span>
     </span>
   </div>
   <div class="view-bar" id="viewBar" data-view="overview">
@@ -5070,11 +5070,17 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     });
   }
 
+  logDuration.addEventListener('input', () => {
+    if ((logType.value === 'paid' || logType.value === 'unpaid') && logDuration.value.trim()) logType.value = 'worked';
+  });
+
   addLogEntryBtn.addEventListener('click', () => {
     const parsed = parseDurationText(logDuration.value);
     const target = parseInt(logTarget.value, 10) || 0;
     const date = logDateInput.value || null;
-    const leaveType = logType.value;
+    let leaveType = logType.value;
+    // Hours entered on a full-day paid/unpaid leave make it a working day
+    if ((leaveType === 'paid' || leaveType === 'unpaid') && logDuration.value.trim()) leaveType = 'worked';
     const wasEditing = logEditingId !== null;
     let toastMsg = '';
 
@@ -5131,7 +5137,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     }
 
     if (leaveType === 'holiday' || LEAVE_LABEL[leaveType]) { setMark(date, leaveType); saveMarks(); toastMsg += ` · ${LEAVE_LABEL[leaveType] || 'Holiday'}`; renderMyMonth(); }
-    else if (wasEditing && markOf(date)) { setMark(date, null); saveMarks(); renderMyMonth(); } // edited back to Worked
+    else if (markOf(date) && (wasEditing || LEAVE_LABEL[markOf(date)])) { setMark(date, null); saveMarks(); renderMyMonth(); } // now a working day: drop its leave mark
     logType.value = 'worked';
     if (date === shiftDayISO()) endShiftFromLog(); // logging the shift's day ends the running shift
     const [dy, dm] = date.split('-').map(Number);

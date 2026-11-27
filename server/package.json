@@ -1,6 +1,6 @@
 {
   "name": "clock-me-out-server",
-  "version": "3.12.34+34",
+  "version": "3.12.36+36",
   "private": true,
   "type": "module",
   "scripts": {
