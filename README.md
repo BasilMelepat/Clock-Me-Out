@@ -6,7 +6,7 @@ React sign-in page · Express API · MongoDB.
 ```
 clock-me-out/
 ├── client/
-│   ├── public/app.html   the Clock me Out app (v3.12.23) with cloud sync and a "Sign out" row in Settings
+│   ├── public/app.html   the Clock me Out app (v3.12.26) with cloud sync and a "Sign out" row in Settings
 │   └── src/              sign-in page (Google or email) and the admin dashboard
 └── server/               Express API
 ```
@@ -49,7 +49,7 @@ The Overview tab shows the month summary tiles, then **Month Goal**, **Salary De
 
 **Log a Day** (Daily Log tab) has a *Day type* dropdown for the same marks (plus Holiday): Click any day in Calendar View to load it into Log a Day, with its hours and Day type, and change it from there. Paid leave and Unpaid leave (full day) need only a date (Unpaid leave removes any mark from the day, so it counts as unpaid once it has passed with nothing logged), and Half day (paid or unpaid) takes the hours you worked, or none to only mark the day. Full-day leave can't be added to a date that already has logged hours. Marking a day replaces any earlier mark on it. In the calendar, paid leave is solid green, a paid half day is a green diagonal split, and an unpaid half day is a red one (a half day that also has hours shows a green or red ½ badge). A full paid leave day is not counted as a working day left in Month Goal.
 
-**Salary.** Enter your **Monthly salary** once in the Salary Deduction card; it applies to every month. For the selected month:
+**Salary.** Use the button in the Salary Deduction card title to enter your **monthly salary** once; it applies to every month. For the selected month:
 - Working days = days in the month minus Sundays and holidays.
 - Unpaid leave = past working days with nothing logged + 0.5 × unpaid half days. Counting starts from your first logged day, and today is not counted until it has passed.
 - Deduction % = unpaid leave ÷ working days × 100, capped at 100.
@@ -86,7 +86,7 @@ Open **https://clock-me-out.vercel.app/admin** and sign in with the admin email 
 | `PUT /api/state` | Replace the user's saved data |
 
 ## Versioning
-MAJOR.MINOR.PATCH+BUILD, kept in `client/package.json` and `server/package.json`. The header badge and `client/public/sw.js` are stamped from `client/package.json` by `npm run build` (script `client/scripts/stamp-version.mjs`). Badge shown (for example v3.12.23).
+MAJOR.MINOR.PATCH+BUILD, kept in `client/package.json` and `server/package.json`. The header badge and `client/public/sw.js` are stamped from `client/package.json` by `npm run build` (script `client/scripts/stamp-version.mjs`). Badge shown (for example v3.12.26).
 - **MAJOR:** a big redesign or a change that breaks saved data.
 - **MINOR:** a new feature.
 - **PATCH:** a fix or small tweak.

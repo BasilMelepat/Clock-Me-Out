@@ -2,7 +2,7 @@
    Keeps the app shell (pages, icons, scripts, fonts) available offline.
    Your saved data is never cached here: it lives in the API (another origin) and the app loads it from the cloud first.
    Update VERSION with every release so old caches are cleared. */
-const VERSION = '3.12.23';
+const VERSION = '3.12.26';
 const CACHE = `clock-me-out-${VERSION}`;
 const PRECACHE = ['/', '/app.html', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/favicon.svg', '/mascot-dir.webp', '/mascot-react.webp'];
 const EXTERNAL = ['fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com'];

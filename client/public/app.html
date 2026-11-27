@@ -2166,6 +2166,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   select.log-duration-input:focus, .holiday-add-row select:focus { border-color: var(--sky); outline: none; }
   select.log-duration-input option, .holiday-add-row select option { font-weight: 500; }
   .holiday-add-row .me-save-btn { grid-column: 1 / -1; width: 100%; }
+  .card-title .me-link-btn { text-transform: none; letter-spacing: 0; flex: none; white-space: nowrap; line-height: 1.3; }
   .me-pay-salary { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
   .me-pay-salary label { font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; }
   .me-pay-salary input {
@@ -2450,7 +2451,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   <div class="brand">
     <span class="brand-text">
       <span class="app-header-title" id="brandTitle" role="link" tabindex="0" title="Go to Shift Details">Clock me Out</span>
-      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.12.23</span></span>
+      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.12.26</span></span>
     </span>
   </div>
   <div class="view-bar" id="viewBar" data-view="overview">
@@ -2811,11 +2812,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
 
   <div class="col" id="mePayCol">
     <div class="card" id="mePayCard">
-      <div class="card-title"><span>💰 Salary Deduction</span></div>
-      <div class="me-pay-salary">
-        <label for="meSalaryInput">Monthly salary</label>
-        <input type="number" id="meSalaryInput" inputmode="decimal" min="0" step="any" placeholder="e.g. 30000" autocomplete="off">
-      </div>
+      <div class="card-title"><span>💰 Salary Deduction</span><button type="button" class="me-link-btn" id="mePayEdit" aria-label="Add salary">➕ Add</button></div>
       <div class="me-tiles">
         <div class="me-tile"><span class="me-tile-label">Working days</span><b class="me-tile-value" id="mePayWork">—</b><span class="me-tile-sub" id="mePayWorkSub">&nbsp;</span></div>
         <div class="me-tile"><span class="me-tile-label">Unpaid leave</span><b class="me-tile-value" id="mePayUnpaid">—</b><span class="me-tile-sub" id="mePayUnpaidSub">&nbsp;</span></div>
@@ -3043,6 +3040,25 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     <div class="holiday-actions">
       <button class="log-io-btn" id="holidayClearBtn" type="button">🗑️ Clear month</button>
       <button class="modal-import-btn" id="holidayDoneBtn" type="button">Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="salaryOverlay" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span>💰 Monthly salary</span>
+      <button class="modal-close" id="salaryCloseBtn" type="button" aria-label="Close">❌</button>
+    </div>
+    <div class="me-pay-salary">
+      <label for="salaryInput">Salary</label>
+      <input type="number" id="salaryInput" inputmode="decimal" min="0" max="999999999" step="any" placeholder="e.g. 30000" autocomplete="off">
+    </div>
+    <div class="log-paste-feedback" id="salaryFeedback"></div>
+    <div class="modal-hint">One amount for every month. It is only used to work out the deduction and is saved with your synced data.</div>
+    <div class="holiday-actions">
+      <button class="log-io-btn" id="salaryRemoveBtn" type="button">🗑️ Remove</button>
+      <button class="modal-import-btn" id="salarySaveBtn" type="button">Save</button>
     </div>
   </div>
 </div>
@@ -6132,8 +6148,8 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
 
     // Salary deduction for the selected month
     const sb = salaryBreakdown(y, m);
-    const salaryInput = $('meSalaryInput');
-    if (document.activeElement !== salaryInput) salaryInput.value = monthlySalary ? String(monthlySalary) : '';
+    $('mePayEdit').textContent = monthlySalary ? '✏️ Edit' : '➕ Add';
+    $('mePayEdit').setAttribute('aria-label', monthlySalary ? 'Edit salary' : 'Add salary');
     const monthLeave = leaveInMonth(y, m);
     $('meLeaveLine').textContent = `Leave: ${monthLeave.length ? monthLeave.length : 'None'} in ${monthName}`;
     $('meLeavePills').innerHTML = monthLeave.map(([d, t]) => `<span class="me-pill leave">${fmtDay(d)} · ${LEAVE_LABEL[t]}</span>`).join('');
@@ -6142,7 +6158,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     setTile('mePayPaid', fmtDays(sb.paid), sb.paid === 1 ? 'day, no deduction' : 'days, no deduction');
     setTile('mePayPct', sb.workingDays ? fmtPct(sb.pct) : '—', sb.workingDays ? 'of salary' : 'no working days', sb.pct ? 'cut' : '');
     setTile('mePayCut', monthlySalary ? fmtMoney(sb.cut) : '—', monthlySalary ? '' : 'add your salary', sb.cut ? 'cut' : '');
-    setTile('mePayNet', monthlySalary ? fmtMoney(sb.net) : '—', monthlySalary ? `of ${fmtMoney(monthlySalary)}` : '');
+    setTile('mePayNet', monthlySalary ? fmtMoney(sb.net) : '—', '');
     $('mePayFormula').textContent = sb.workingDays
       ? `${fmtDays(sb.unpaid)} unpaid ÷ ${sb.workingDays} working days = ${fmtPct(sb.pct)}. Past working days with nothing logged count as unpaid leave, plus half a day per unpaid half day. Paid leave doesn't deduct.`
       : `There are no working days in ${monthName}.`;
@@ -6281,19 +6297,47 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
 
   document.getElementById('meLeaveEdit').addEventListener('click', openHolidayModal);
 
-  function saveSalaryFromInput() {
-    const input = document.getElementById('meSalaryInput');
-    const raw = input.value.trim();
-    const n = raw === '' ? 0 : Number(raw);
-    if (!Number.isFinite(n) || n < 0 || n > 1e9) { input.value = monthlySalary ? String(monthlySalary) : ''; toast('Enter a salary between 0 and 1,000,000,000'); return; }
-    const next = Math.round(n * 100) / 100;
-    if (next === monthlySalary) return;
-    monthlySalary = next;
-    savePay();
-    renderMyMonth();
+  const salaryOverlay = document.getElementById('salaryOverlay');
+  const salaryInput = document.getElementById('salaryInput');
+  const salaryFeedback = document.getElementById('salaryFeedback');
+
+  function openSalaryModal() {
+    salaryFeedback.textContent = '';
+    salaryInput.value = monthlySalary ? String(monthlySalary) : '';
+    salaryOverlay.style.display = 'flex';
+    salaryInput.focus();
+    salaryInput.select();
   }
-  document.getElementById('meSalaryInput').addEventListener('change', saveSalaryFromInput);
-  document.getElementById('meSalaryInput').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); });
+
+  function closeSalaryModal() { salaryOverlay.style.display = 'none'; }
+
+  function saveSalary() {
+    const raw = salaryInput.value.trim();
+    const n = Number(raw);
+    if (raw === '' || !Number.isFinite(n) || n < 0 || n > 999999999) { salaryFeedback.textContent = 'Enter a salary between 0 and 999,999,999.'; flashInvalid(salaryInput); return; }
+    monthlySalary = Math.round(n * 100) / 100;
+    savePay();
+    closeSalaryModal();
+    renderMyMonth();
+    toast(monthlySalary ? '💰 Salary saved' : '💰 Salary removed');
+  }
+
+  function removeSalary() {
+    const before = monthlySalary;
+    if (!before) { closeSalaryModal(); return; }
+    monthlySalary = 0;
+    savePay();
+    closeSalaryModal();
+    renderMyMonth();
+    toast('💰 Salary removed', () => { monthlySalary = before; savePay(); renderMyMonth(); toast('↩️ Salary restored'); });
+  }
+
+  document.getElementById('mePayEdit').addEventListener('click', openSalaryModal);
+  document.getElementById('salaryCloseBtn').addEventListener('click', closeSalaryModal);
+  document.getElementById('salarySaveBtn').addEventListener('click', saveSalary);
+  document.getElementById('salaryRemoveBtn').addEventListener('click', removeSalary);
+  salaryInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); saveSalary(); } });
+  salaryOverlay.addEventListener('click', e => { if (e.target === salaryOverlay) closeSalaryModal(); });
 
   document.getElementById('holidayCloseBtn').addEventListener('click', closeHolidayModal);
 
@@ -6852,6 +6896,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     const clearOverlay = document.getElementById('clearLogOverlay');
     if (clearOverlay.style.display === 'flex') { clearOverlay.style.display = 'none'; closed = true; }
     if (document.getElementById('holidayOverlay').style.display === 'flex') { closeHolidayModal(); closed = true; }
+    if (salaryOverlay.style.display === 'flex') { closeSalaryModal(); closed = true; }
     if (!closed && currentView === 'settings') leaveSettings();
   });
 
