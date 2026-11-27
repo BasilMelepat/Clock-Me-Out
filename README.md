@@ -6,7 +6,7 @@ React sign-in page · Express API · MongoDB.
 ```
 clock-me-out/
 ├── client/
-│   ├── public/app.html   the Clock me Out app (v3.12.26) with cloud sync and a "Sign out" row in Settings
+│   ├── public/app.html   the Clock me Out app (v3.12.34) with cloud sync and a "Sign out" row in Settings
 │   └── src/              sign-in page (Google or email) and the admin dashboard
 └── server/               Express API
 ```
@@ -86,7 +86,7 @@ Open **https://clock-me-out.vercel.app/admin** and sign in with the admin email 
 | `PUT /api/state` | Replace the user's saved data |
 
 ## Versioning
-MAJOR.MINOR.PATCH+BUILD, kept in `client/package.json` and `server/package.json`. The header badge and `client/public/sw.js` are stamped from `client/package.json` by `npm run build` (script `client/scripts/stamp-version.mjs`). Badge shown (for example v3.12.26).
+MAJOR.MINOR.PATCH+BUILD, kept in `client/package.json` and `server/package.json`. The header badge and `client/public/sw.js` are stamped from `client/package.json` by `npm run build` (script `client/scripts/stamp-version.mjs`). Badge shown (for example v3.12.34).
 - **MAJOR:** a big redesign or a change that breaks saved data.
 - **MINOR:** a new feature.
 - **PATCH:** a fix or small tweak.

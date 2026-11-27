@@ -1220,7 +1220,10 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     padding: 2px 6px;
     line-height: 1;
   }
-  .modal-close:hover { opacity: 0.7; }
+  /* Same hover as the other ❌ buttons: the icon grows a little */
+  .modal-close { display: inline-block; transition: transform .15s ease; }
+  .modal-close:hover, .modal-close:focus-visible { transform: scale(1.4); }
+  @media (prefers-reduced-motion: reduce) { .modal-close { transition: none; } }
   .modal-textarea {
     width: 100%;
     min-height: 80px;
@@ -1888,6 +1891,14 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   .holiday-actions { display: flex; gap: 10px; align-items: stretch; margin-top: 14px; }
   .holiday-actions .log-io-btn { flex: 0 0 auto; padding: 0 14px; }
   .holiday-actions .modal-import-btn { flex: 1; margin-top: 0; }
+  /* Salary modal: input matches the other fields, without the browser's spinner */
+  #salaryInput { height: 42px; box-sizing: border-box; padding: 0 12px; font-size: 15px; font-weight: 600; -moz-appearance: textfield; appearance: textfield; }
+  #salaryInput::-webkit-outer-spin-button, #salaryInput::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  #salaryOverlay .me-pay-salary { margin-bottom: 4px; }
+  /* Salary modal: regular-size buttons, right-aligned */
+  #salaryOverlay .holiday-actions { justify-content: flex-end; align-items: center; }
+  #salaryOverlay .holiday-actions .log-io-btn { padding: 10px 14px; font-size: 13px; }
+  #salaryOverlay .holiday-actions .modal-import-btn { flex: 0 0 auto; width: auto; padding: 10px 24px; font-size: 14px; border-radius: 10px; }
 
   /* ---- Header: the same minimal bar on every screen size ---- */
   .app-header { justify-content: space-between; align-items: center; gap: 24px; padding: 6px 4px 22px; }
@@ -2100,20 +2111,16 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   .wrap.wrap-settings { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 1360px; }
   .wrap-settings > .col { min-width: 0; }
   @media (max-width: 1000px) {
-    .wrap.wrap-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto auto 1fr; grid-template-areas: "top top" "profile prefs" "data prefs"; max-width: 900px; }
-    .wrap-settings > .settings-top { grid-area: top; }
+    .wrap.wrap-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto 1fr; grid-template-areas: "profile prefs" "data prefs"; max-width: 900px; }
     .set-col-profile { grid-area: profile; } .set-col-prefs { grid-area: prefs; } .set-col-data { grid-area: data; }
   }
   @media (max-width: 700px) {
     .wrap.wrap-settings { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: none; max-width: 560px; }
-    .wrap-settings > .settings-top, .set-col-profile, .set-col-prefs, .set-col-data { grid-area: auto; }
+    .set-col-profile, .set-col-prefs, .set-col-data { grid-area: auto; }
   }
   .wrap-settings .card { padding-bottom: 8px; }
   .settings-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
   .settings-head .card-title { margin-bottom: 0; }
-  .settings-back { display: inline-flex; align-items: center; gap: 4px; padding: 7px 12px; font: inherit; font-size: 13px; font-weight: 700; color: var(--deep); background: var(--sky-light); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; transition: border-color 0.15s; }
-  .settings-back:hover { border-color: var(--sky); }
-  .settings-back:focus-visible { outline: 2px solid var(--sky); outline-offset: 2px; }
   .wrap-settings .settings-block { margin: 0; padding: 18px 0; border-top: 1px solid var(--line); }
   .wrap-settings .settings-head + .settings-block { padding-top: 4px; border-top: none; }
   .wrap-settings .settings-block > label { display: block; margin-bottom: 10px; }
@@ -2375,9 +2382,6 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   @media (max-width: 780px) { .cmo-toast { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); } }
 
   /* Settings: three columns like the home page, one card each, simple divided rows */
-  .settings-top { grid-column: 1 / -1; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin: 2px 2px 0; }
-  .settings-h { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--deep); }
-  .settings-lead { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
   .wrap-settings .set-sec .card-title + .settings-block { padding-top: 2px; border-top: none; }
   .wrap-settings .set-sec .settings-block:last-child { padding-bottom: 10px; }
   .wrap-settings .settings-reset .me-danger-btn { color: #C0392B; border-color: color-mix(in srgb, #C0392B 45%, var(--line)); }
@@ -2451,7 +2455,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   <div class="brand">
     <span class="brand-text">
       <span class="app-header-title" id="brandTitle" role="link" tabindex="0" title="Go to Shift Details">Clock me Out</span>
-      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.12.26</span></span>
+      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.12.34</span></span>
     </span>
   </div>
   <div class="view-bar" id="viewBar" data-view="overview">
@@ -2812,7 +2816,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
 
   <div class="col" id="mePayCol">
     <div class="card" id="mePayCard">
-      <div class="card-title"><span>💰 Salary Deduction</span><button type="button" class="me-link-btn" id="mePayEdit" aria-label="Add salary">➕ Add</button></div>
+      <div class="card-title"><span>💰 Salary Deduction</span><button type="button" class="me-link-btn" id="mePayEdit">➕ Add salary</button></div>
       <div class="me-tiles">
         <div class="me-tile"><span class="me-tile-label">Working days</span><b class="me-tile-value" id="mePayWork">—</b><span class="me-tile-sub" id="mePayWorkSub">&nbsp;</span></div>
         <div class="me-tile"><span class="me-tile-label">Unpaid leave</span><b class="me-tile-value" id="mePayUnpaid">—</b><span class="me-tile-sub" id="mePayUnpaidSub">&nbsp;</span></div>
@@ -2836,11 +2840,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   <div class="app-footer footer-desktop">© 2026 Basil Melepat · Designed for You</div>
 </div>
 
-<div class="wrap wrap-settings" id="viewSettings" hidden>
-  <div class="settings-top">
-    <div><h2 class="settings-h">⚙️ Settings</h2><p class="settings-lead">Make Clock me Out yours.</p></div>
-    <button class="settings-back" id="settingsBackBtn" type="button">‹ Back</button>
-  </div>
+<div class="wrap wrap-settings" id="viewSettings" aria-label="Settings" hidden>
   <div class="col set-col-profile">
     <section class="card set-sec">
       <div class="card-title"><span>👤 Profile</span></div>
@@ -6148,8 +6148,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
 
     // Salary deduction for the selected month
     const sb = salaryBreakdown(y, m);
-    $('mePayEdit').textContent = monthlySalary ? '✏️ Edit' : '➕ Add';
-    $('mePayEdit').setAttribute('aria-label', monthlySalary ? 'Edit salary' : 'Add salary');
+    $('mePayEdit').textContent = monthlySalary ? '✏️ Edit salary' : '➕ Add salary';
     const monthLeave = leaveInMonth(y, m);
     $('meLeaveLine').textContent = `Leave: ${monthLeave.length ? monthLeave.length : 'None'} in ${monthName}`;
     $('meLeavePills').innerHTML = monthLeave.map(([d, t]) => `<span class="me-pill leave">${fmtDay(d)} · ${LEAVE_LABEL[t]}</span>`).join('');
@@ -6965,7 +6964,6 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   // The gear opens Settings as a full page (no popup); the gear again, Back, or Escape returns to the tab you came from
   const leaveSettings = () => switchView(lastMainView);
   document.getElementById('settingsBtn').addEventListener('click', () => (currentView === 'settings' ? leaveSettings() : switchView('settings')));
-  document.getElementById('settingsBackBtn').addEventListener('click', leaveSettings);
 
   // Swipe left / right to move between the three tabs (touch devices only).
   // Ignored when: more than one finger, the gesture starts near the screen edge (browser back gesture),
