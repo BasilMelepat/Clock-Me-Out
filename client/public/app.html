@@ -435,6 +435,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     gap: 6px;
   }
   .log-add-row .log-add-btn { flex: 1; min-width: 0; }
+  .log-input-box[hidden] { display: none; }
   .log-input-box {
     /* Grid items default to min-width: auto; reset it so the equal minmax(0, 1fr) columns apply. */
     min-width: 0;
@@ -2137,10 +2138,12 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   body.dark-mode .calendar-cell.is-absent { background: rgba(255, 107, 96, 0.16); color: #FF8A80; }
   .calendar-dot.holiday { background: #8B6CE0; }
   .calendar-dot.absent { background: #E0453C; }
-  .calendar-cell.is-leave { background: rgba(46, 160, 120, 0.15); color: #1F8A62; }
-  body.dark-mode .calendar-cell.is-leave { background: rgba(80, 200, 150, 0.16); color: #7BE0B5; }
-  .cal-st.leave, .cal-st.half-paid { color: #1F8A62; }
-  body.dark-mode .cal-st.leave, body.dark-mode .cal-st.half-paid { color: #7BE0B5; }
+  .calendar-cell.is-leave { background: rgba(139, 195, 74, 0.3); color: #4F7D12; }
+  body.dark-mode .calendar-cell.is-leave { background: rgba(174, 213, 129, 0.2); color: #B5E07A; }
+  .cal-st.leave { color: #4F7D12; }
+  body.dark-mode .cal-st.leave { color: #B5E07A; }
+  .cal-st.half-paid { color: #1F8A62; }
+  body.dark-mode .cal-st.half-paid { color: #7BE0B5; }
   .cal-st.half-unpaid { color: #C0392B; }
   body.dark-mode .cal-st.half-unpaid { color: #FF8A80; }
   /* Half days: a diagonal split, green when paid and red when unpaid */
@@ -2152,7 +2155,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   .cal-half-badge { position: absolute; top: 3px; right: 4px; padding: 0 4px; border-radius: 6px; font-size: 8.5px; font-weight: 800; line-height: 13px; color: #fff; }
   .cal-half-badge.paid { background: #2EA078; }
   .cal-half-badge.unpaid { background: #E0453C; }
-  .calendar-dot.leave { background: #2EA078; }
+  .calendar-dot.leave { background: #8BC34A; }
   .calendar-dot.half-paid { background: linear-gradient(135deg, #2EA078 50%, rgba(120, 160, 200, 0.35) 50%); }
   .calendar-dot.half-unpaid { background: linear-gradient(135deg, #E0453C 50%, rgba(120, 160, 200, 0.35) 50%); }
   .me-pill.leave, .holiday-chip.leave { background: #E7F7F0; border-color: #A8DEC6; color: #1F6F51; }
@@ -2455,7 +2458,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
   <div class="brand">
     <span class="brand-text">
       <span class="app-header-title" id="brandTitle" role="link" tabindex="0" title="Go to Shift Details">Clock me Out</span>
-      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.12.36</span></span>
+      <span class="brand-meta"><span class="version-badge" id="versionBadge" role="button" tabindex="0" title="Reload page" aria-label="Reload page">v3.12.40</span></span>
     </span>
   </div>
   <div class="view-bar" id="viewBar" data-view="overview">
@@ -4916,6 +4919,16 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     renderLogSummary();
   }
 
+  // Full-day leave needs only a date, so the hours fields are hidden (and cleared)
+  function setLogType(type) {
+    logType.value = type;
+    const fullLeave = type === 'paid' || type === 'unpaid';
+    if (fullLeave) logDuration.value = '';
+    logDuration.closest('.log-input-box').hidden = fullLeave;
+    logTarget.closest('.log-input-box').hidden = fullLeave;
+  }
+  logType.addEventListener('change', () => setLogType(logType.value));
+
   function startEditLogEntry(id) {
     const entry = logEntries.find(e => e.id === id);
     if (!entry) return;
@@ -4923,7 +4936,8 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     logDuration.value = `${entry.hh}h ${entry.mm}m ${entry.ss}s`;
     logTarget.value = pad(entry.target);
     logDateInput.value = entry.date || '';
-    logType.value = (entry.date && markOf(entry.date)) || 'worked';
+    const mark = entry.date ? markOf(entry.date) : null;
+    setLogType(mark && mark !== 'paid' ? mark : 'worked'); // an entry with hours is a working day, even under a paid-leave mark
     addLogEntryBtn.textContent = 'Update';
     addLogEntryBtn.classList.add('editing');
     markEditingRow();
@@ -4937,7 +4951,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     markEditingRow();
     logDuration.value = '';
     logDateInput.value = '';
-    logType.value = 'worked';
+    setLogType('worked');
   }
 
   function isInMonth(entry, year, monthIndex) {
@@ -5053,7 +5067,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     const before = markOf(date);
     setMark(date, type);
     saveMarks();
-    logType.value = 'worked';
+    setLogType('worked');
     logDateInput.value = '';
     const [dy, dm] = date.split('-').map(Number);
     calendarYear = dy;
@@ -5070,21 +5084,45 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
     });
   }
 
-  logDuration.addEventListener('input', () => {
-    if ((logType.value === 'paid' || logType.value === 'unpaid') && logDuration.value.trim()) logType.value = 'worked';
-  });
-
   addLogEntryBtn.addEventListener('click', () => {
     const parsed = parseDurationText(logDuration.value);
     const target = parseInt(logTarget.value, 10) || 0;
     const date = logDateInput.value || null;
-    let leaveType = logType.value;
-    // Hours entered on a full-day paid/unpaid leave make it a working day
-    if ((leaveType === 'paid' || leaveType === 'unpaid') && logDuration.value.trim()) leaveType = 'worked';
+    const leaveType = logType.value;
     const wasEditing = logEditingId !== null;
     let toastMsg = '';
 
     const fullDayLeave = leaveType === 'paid' || leaveType === 'unpaid';
+    // Editing a logged day into full-day leave replaces its hours with that leave
+    if (wasEditing && fullDayLeave) {
+      const entry = logEntries.find(e => e.id === logEditingId);
+      if (!date) { flashInvalid(logDateInput); logDateInput.focus(); return; }
+      if (logEntries.some(e => e.date === date && e.id !== logEditingId)) {
+        flashInvalid(logDateInput);
+        toast(`${dmy(date)} already has logged hours. Delete that entry first, or pick Half day.`);
+        return;
+      }
+      const prevMark = markOf(date);
+      logEntries = logEntries.filter(e => e.id !== logEditingId);
+      cancelEditLogEntry();
+      setMark(date, leaveType === 'paid' ? 'paid' : null);
+      saveMarks();
+      saveLogEntries();
+      const [dy, dm] = date.split('-').map(Number);
+      calendarYear = dy;
+      calendarMonth = dm - 1;
+      followMonthInMyMonth(dy, dm - 1);
+      renderLogList();
+      calculateLog();
+      renderMyMonth();
+      toast(`🌴 ${dmy(date)}: ${leaveType === 'paid' ? 'Paid leave' : 'Unpaid leave'} replaces the logged hours`, () => {
+        setMark(date, prevMark);
+        saveMarks();
+        if (entry) restoreLogEntries([entry]);
+        toast('↩️ Entry restored');
+      });
+      return;
+    }
     const markOnly = !wasEditing && (fullDayLeave || (leaveType !== 'worked' && !logDuration.value.trim()));
     if (markOnly) {
       if (!date) { flashInvalid(logDateInput); logDateInput.focus(); return; }
@@ -5138,7 +5176,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
 
     if (leaveType === 'holiday' || LEAVE_LABEL[leaveType]) { setMark(date, leaveType); saveMarks(); toastMsg += ` · ${LEAVE_LABEL[leaveType] || 'Holiday'}`; renderMyMonth(); }
     else if (markOf(date) && (wasEditing || LEAVE_LABEL[markOf(date)])) { setMark(date, null); saveMarks(); renderMyMonth(); } // now a working day: drop its leave mark
-    logType.value = 'worked';
+    setLogType('worked');
     if (date === shiftDayISO()) endShiftFromLog(); // logging the shift's day ends the running shift
     const [dy, dm] = date.split('-').map(Number);
     calendarYear = dy;
@@ -5339,7 +5377,7 @@ body.dark-mode #clkSplash { background: linear-gradient(160deg, var(--page-a, #0
       const firstLoggedISO = logEntries.filter(e => e.date).map(e => e.date).sort()[0] || null;
       const [cy, cm, cd] = iso.split('-').map(Number);
       const unpaid = calendarDayKind(iso, new Date(cy, cm - 1, cd).getDay(), null, todayISO, firstLoggedISO) === 'absent';
-      logType.value = mark || (unpaid ? 'unpaid' : 'worked');
+      setLogType(mark || (unpaid ? 'unpaid' : 'worked'));
       logDuration.focus();
     }
   }
